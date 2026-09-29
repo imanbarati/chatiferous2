@@ -52,11 +52,84 @@
     } else {
       for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     }
-    const res = await fetch(url, opts);
+    let res;
+    try {
+      res = await fetch(url, opts);
+    } catch (err) {
+      missed();
+      throw new NoSignal();
+    }
     if (res.status === 401) { location.href = APP.base + 'login.php'; throw new Error('signed out'); }
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (err) {
+      // Something other than the app answered: the host's rate limiter, a gateway error, a proxy's
+      // holding page. Reading an HTML page as JSON throws a parse error nobody can act on, so it
+      // counts as having no signal — the member sees the copy on this device instead.
+      missed();
+      throw new NoSignal();
+    }
     if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+    misses = 0;
+    setOffline(false);
     return data;
+  }
+
+  // Not being able to reach the server, told apart from the server saying no. Callers fall back to
+  // what this device has kept rather than showing an error for something nobody can fix.
+  class NoSignal extends Error {
+    constructor() {
+      super('No connection.');
+      this.name = 'NoSignal';
+    }
+  }
+
+  // Whether the app can reach the server. Everything that should look or behave differently hangs
+  // off the one body class, so there is a single answer to the question on screen at any moment.
+  function setOffline(on) {
+    on = !!on;
+    if (document.body.classList.contains('is-offline') === on) return;
+    document.body.classList.toggle('is-offline', on);
+    offlineUi();
+  }
+
+  const offlineNow = () => document.body.classList.contains('is-offline');
+
+  // One failed call is a hiccup: a rate limit, a dropped packet, a host having a moment. Announcing
+  // "no connection" for that is worse than saying nothing, and it used to take the message box away
+  // mid-sentence. Two failures in a row, or the browser saying so itself, is news worth breaking.
+  let misses = 0;
+  function missed() {
+    misses++;
+    if (!navigator.onLine || misses >= 2) setOffline(true);
+  }
+
+  // Says so, and stops the message box pretending it can send.
+  //
+  // The box itself is never disabled. Someone may well want to write their reply while they wait,
+  // and taking the keyboard away mid-sentence throws the words away — which is what it did before
+  // this was written down. Only sending is stopped, and nothing is queued: what was written waits
+  // in the draft, where its author can see it, until there is a signal to send it over.
+  function offlineUi() {
+    const off = offlineNow();
+    for (const ta of document.querySelectorAll('.composer textarea')) {
+      if (ta.dataset.ph === undefined) ta.dataset.ph = ta.placeholder || '';
+      ta.placeholder = off ? 'No connection — you can write, but not send yet' : ta.dataset.ph;
+    }
+    const send = $('.composer .send', chatEl);
+    if (send && off) send.disabled = true;
+    else if (send) updateSendButton();
+    let note = $('#offline-note');
+    if (off && !note) {
+      note = document.createElement('div');
+      note.id = 'offline-note';
+      note.className = 'offline-note';
+      note.textContent = 'No connection — showing what’s on this device.';
+      document.body.append(note);
+    } else if (!off && note) {
+      note.remove();
+    }
   }
 
   const sameDay = (a, b) => a.toDateString() === b.toDateString();
@@ -100,7 +173,7 @@
     return words.slice(0, 2).map((w) => [...w][0]).join('').toUpperCase() || '?';
   }
 
-  // Someone's picture, or a coloured circle with their initials when they haven't one.
+  // Someone's picture, or a colored circle with their initials when they haven't one.
   function avatar(userId, cls = '') {
     const u = state.users[userId] || { name: '?', color: 0 };
     if (u.photo) return `<img class="avatar ${cls}" src="${esc(u.photo)}" alt="" loading="lazy">`;
@@ -109,21 +182,21 @@
 
   // A topic's leading image: # for General, its emoji, its chosen symbol, or its first letter.
   // A topic's picture: its symbol (topic-icons.svg) or first letter, in a rounded square tinted
-  // with the topic's colour. The symbol takes a strong shade of the same colour, so it reads
-  // against the tint at any size; the square and the symbol colours are set in chat.css.
+  // with the topic's color. The symbol takes a strong shade of the same color, so it reads
+  // against the tint at any size; the square and the symbol colors are set in chat.css.
   function topicIcon(t, cls = '') {
     if (t.general) return `<span class="ticon general ${cls}" aria-hidden="true">#</span>`;
     if (t.emoji) return `<span class="ticon emoji ${cls}" aria-hidden="true">${esc(t.emoji)}</span>`;
-    const colour = `c${t.color % 6}`;
+    const color = `c${t.color % 6}`;
     const inner = t.icon && /^[a-z0-9-]+$/.test(t.icon)
       // A square has no tail to leave room for, so the symbol fills more of it than it could in
       // the old bubble: about four fifths, edge to edge.
       ? `<svg viewBox="0 0 24 24" aria-hidden="true"><use href="${APP.icons}#ti-${t.icon}" x="2.4" y="2.4" width="19.2" height="19.2"/></svg>`
       : `<span class="ticon-letter">${esc(([...t.title.trim()][0] || '?').toUpperCase())}</span>`;
-    // The symbol is always white; the square carries the colour. For subjects with an obvious
-    // colour (heart, tree, flame, crown…) chat.css gives that square its own hue.
+    // The symbol is always white; the square carries the color. For subjects with an obvious
+    // color (heart, tree, flame, crown…) chat.css gives that square its own hue.
     const named = t.icon && /^[a-z0-9-]+$/.test(t.icon) ? ` ti-${t.icon}` : '';
-    return `<span class="ticon square ${colour}${named} ${cls}" aria-hidden="true">${inner}</span>`;
+    return `<span class="ticon square ${color}${named} ${cls}" aria-hidden="true">${inner}</span>`;
   }
 
   // ---------- Formatted text ----------
@@ -138,6 +211,8 @@
     const u = url.trim();
     if (/^(https?:|mailto:)/i.test(u)) return u;
     if (/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(u)) return 'https://' + u;
+    // A path inside the app itself, as the daily reading uses to point at its own page.
+    if (u.startsWith(APP.base) && !u.includes('//') && !u.includes(':')) return u;
     return null;
   }
 
@@ -147,7 +222,11 @@
     switch (e.type) {
       case 'text_link': case 'url': {
         const href = safeHref(e.type === 'url' ? whole : (e.url || ''));
-        return href ? [`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">`, '</a>'] : ['', ''];
+        if (!href) return ['', ''];
+        // A link into the app itself opens in the app; anywhere else opens in a new tab.
+        return href.startsWith(APP.base)
+          ? [`<a href="${esc(href)}">`, '</a>']
+          : [`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">`, '</a>'];
       }
       case 'email': return [`<a href="mailto:${esc(whole)}">`, '</a>'];
       case 'mention': case 'mention_name': return ['<span class="mention">', '</span>'];

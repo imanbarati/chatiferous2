@@ -24,20 +24,35 @@ $user = api_user();
 $book = strtoupper((string)($_GET['b'] ?? ''));
 $chapter = (int)($_GET['c'] ?? 0);
 $verse = (int)($_GET['verse'] ?? 0);
-if (!isset(BIBLE_CANON[$book]) || $chapter < 1 || $verse < 1) {
+// verse=0 asks for the whole chapter at once, which is how the reader now fetches it.
+if (!isset(BIBLE_CANON[$book]) || $chapter < 1 || $verse < 0) {
     json_out(['error' => 'No such verse.'], 400);
 }
 
 $chosen = commentary_chosen((int)$user['id']);
 $have = commentary_have($book, $chapter);
 
+// A whole chapter is normally a sensible size — three works, the usual choice, come to about
+// 160 KB — and one request per chapter beats one per verse for everybody. But somebody who turns
+// on a dozen works would be fetching megabytes every time they tapped a verse number, so past a
+// budget the chapter is declined and the reader goes back to asking verse by verse.
+const COMMENTARY_CHAPTER_BUDGET = 500 * 1024;
+$entries = commentary_for($book, $chapter, $verse, $chosen);
+$partial = false;
+if ($verse === 0 && strlen(json_encode($entries)) > COMMENTARY_CHAPTER_BUDGET) {
+    $entries = [];
+    $partial = true;
+}
+
 json_out([
     'book'    => $book,
     'chapter' => $chapter,
     'verse'   => $verse,
     'chosen'  => $chosen,
-    'entries' => commentary_for($book, $chapter, $verse, $chosen),
-    // The whole catalogue, each marked with whether this chapter has it, so the chooser can be
+    'entries' => $entries,
+    // True when the chapter was too big to send whole: ask for the verses one at a time.
+    'partial' => $partial,
+    // The whole catalog, each marked with whether this chapter has it, so the chooser can be
     // honest about what's there before anyone taps it.
     'works'   => array_map(fn($w) => [
         'code' => $w['code'], 'name' => $w['name'], 'edition' => $w['edition'],

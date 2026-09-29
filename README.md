@@ -9,7 +9,7 @@ every day.
 ## What it does
 
 - **Topics**, like Telegram's forum groups: a General topic plus as many as you like, with
-  colours or icons, pinning to the top, closing, and unread counts.
+  colors or icons, pinning to the top, closing, and unread counts.
 - **Messages**: replies, quotes, edits, deletes, forwards, reactions (with unread counts),
   @mentions, link previews, photos, files, videos, GIFs (optional), pinned messages, polls
   (anonymous or not, single or multiple choice, changeable votes, who voted for what).

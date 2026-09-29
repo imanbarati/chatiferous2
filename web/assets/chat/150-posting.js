@@ -89,21 +89,29 @@
     if (m) { window.getSelection()?.removeAllRanges(); startReply(plainView(m)); }
   });
 
-  // Touch: hold a reaction for half a second to see who reacted (iPhones have no long-press event).
-  let rxHold = null, rxHeld = false;
+  // Touch: hold a reaction to see who reacted (iPhones have no long-press event). Half a second
+  // is a long time to hold something and see nothing happen; a third of one is the moment a hold
+  // stops reading as a tap.
+  let rxHold = null, rxHeld = false, rxAt = null;
   chatEl.addEventListener('pointerdown', (e) => {
     const chip = e.target.closest('.rx[data-react]');
     if (!chip || e.pointerType !== 'touch') return;
     rxHeld = false;
+    rxAt = { x: e.clientX, y: e.clientY };
     rxHold = setTimeout(() => {
       rxHeld = true;
       setTimeout(() => { rxHeld = false; }, 1500);
       openReacters(+chip.closest('[data-id]').dataset.id, chip.dataset.react);
-    }, 500);
+    }, 330);
   });
-  for (const t of ['pointerup', 'pointercancel', 'pointermove']) {
-    chatEl.addEventListener(t, (e) => { if (t !== 'pointermove' || Math.abs(e.movementY) > 4) clearTimeout(rxHold); });
-  }
+  const dropHold = () => { clearTimeout(rxHold); rxAt = null; };
+  for (const t of ['pointerup', 'pointercancel']) chatEl.addEventListener(t, dropHold);
+  // A finger that has travelled is scrolling, not holding. movementX/Y read as 0 on touch
+  // pointers in more than one browser, so measure from where the finger went down.
+  chatEl.addEventListener('pointermove', (e) => {
+    if (!rxAt) return;
+    if (Math.abs(e.clientX - rxAt.x) > 10 || Math.abs(e.clientY - rxAt.y) > 10) dropHold();
+  });
   // After a hold, the finger lifting mustn't count as a tap: not on the reaction (which would
   // toggle it) nor on the sheet that just opened under the finger (which would close it).
   document.addEventListener('click', (e) => {
@@ -113,22 +121,27 @@
   // The sheet listing who reacted with a given emoji (hold a reaction chip).
   async function openReacters(messageId, emoji) {
     if (document.querySelector('.reacters-sheet')) return;
-    let data;
-    try { data = await api('reactions.php', { id: messageId }); } catch (e) { toast(e.message); return; }
-    Object.assign(state.users, data.users || {});
-    const list = [...data.reactions].sort((a, b) => (b.emoji === emoji) - (a.emoji === emoji));
+    // The sheet goes up the moment the hold is recognised. Waiting for the names first means a
+    // held finger and a blank screen for as long as the round trip takes.
     const el = document.createElement('div');
     el.className = 'modal gif-modal';
     el.innerHTML = `<div class="sheet-card votes-sheet reacters-sheet" role="dialog" aria-label="Reactions">
         <div class="fwd-top"><strong>Reactions</strong><button class="link votes-close" aria-label="Close">✕</button></div>
-        <div class="votes-list">${list.map((r) => `<section>
-          <h3><span class="rx-emoji">${esc(r.emoji)}</span><span class="votes-n">${r.users.length + r.extra}</span></h3>
-          ${r.users.map((id) => `<div class="voter">${avatar(id, 'sm')}<span>${esc((state.users[id] || { name: '?' }).name)}</span></div>`).join('')}
-          ${r.extra ? `<div class="voter muted small">+ ${r.extra} from Telegram (names not recorded)</div>` : ''}
-        </section>`).join('') || '<p class="loading">No reactions.</p>'}</div>
+        <div class="votes-list"><p class="loading">Loading…</p></div>
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', (e) => { if (e.target === el || e.target.closest('.votes-close')) el.remove(); });
+
+    let data;
+    try { data = await api('reactions.php', { id: messageId }); } catch (e) { el.remove(); toast(e.message); return; }
+    if (!el.isConnected) return;         // closed again while the names were on their way
+    Object.assign(state.users, data.users || {});
+    const list = [...data.reactions].sort((a, b) => (b.emoji === emoji) - (a.emoji === emoji));
+    $('.votes-list', el).innerHTML = `${list.map((r) => `<section>
+          <h3><span class="rx-emoji">${esc(r.emoji)}</span><span class="votes-n">${r.users.length + r.extra}</span></h3>
+          ${r.users.map((id) => `<div class="voter">${avatar(id, 'sm')}<span>${esc((state.users[id] || { name: '?' }).name)}</span></div>`).join('')}
+          ${r.extra ? `<div class="voter muted small">+ ${r.extra} from Telegram (names not recorded)</div>` : ''}
+        </section>`).join('') || '<p class="loading">No reactions.</p>'}`;
   }
 
   // Touch: swipe a message left to reply.

@@ -16,6 +16,8 @@
     });
     bottomWatch.observe($('.messages', chatEl));
     bottomWatch.observe(scroller);
+    if (scroller.dataset.bound) return;     // a shell that was kept has kept its listeners too
+    scroller.dataset.bound = '1';
     scroller.addEventListener('scroll', () => {
       state.stuck = atBottom(scroller);
       if (scroller.scrollTop < 400) loadMore('older');
@@ -77,7 +79,8 @@
     if (push) history.pushState({}, '', APP.base + (state.listMode === 'dms' ? 'messages' : ''));
     document.body.classList.remove('chat-open');
     state.view = null;
-    chatEl.innerHTML = '<div class="chat-empty"><span>Select a topic</span></div>';
+    chatEl.innerHTML = '<div class="chat-empty"><span>'
+      + (state.listMode === 'dms' ? 'Select a conversation' : 'Select a topic') + '</span></div>';
     renderTopics();
     loadTopics();
   }
@@ -89,6 +92,8 @@
     const m = path.match(/^t\/(\d+)(?:\/(\d+))?/);
     if (m) { openTopic(+m[1], m[2] ? +m[2] : 0); return; }
     state.listMode = path.startsWith('messages') ? 'dms' : 'topics';
+    const empty = $('.chat-empty span');
+    if (empty) empty.textContent = state.listMode === 'dms' ? 'Select a conversation' : 'Select a topic';
     if (state.view) closeTopic(false); else renderTopics();
   }
 
@@ -107,10 +112,17 @@
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) saveDraft();
+    if (document.hidden) { saveDraft(); keepView(true); }
     else { scheduleSync(0); queueRead(); }
   });
-  window.addEventListener('pagehide', () => { savePos(); saveDraft(); });
+  window.addEventListener('pagehide', () => { savePos(); saveDraft(); keepView(true); });
+
+  // The browser knows there is no signal before we try to use it, so come up already saying so
+  // rather than after a failed call. A signal coming back is only a hint — the next call settles
+  // it — so returning is handled by asking for the topic list again.
+  if (!navigator.onLine) setOffline(true);
+  window.addEventListener('offline', () => setOffline(true));
+  window.addEventListener('online', () => { loadTopics(); scheduleSync(0); });
 
   // =====================================================================
   // Posting

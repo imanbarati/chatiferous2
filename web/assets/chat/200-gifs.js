@@ -72,4 +72,17 @@
     if (!TOUCH) input.focus();
   }
 
-  Promise.all([loadTopics(), loadDms()]).then(() => { route(); scheduleSync(); e2eReady(false).catch(() => {}); });
+  Promise.all([loadTopics(), loadDms()]).then(() => {
+    route(); scheduleSync(); e2eReady(false).catch(() => {});
+    // Once the app has nothing else to do, keep what a member would want with no signal. Nobody
+    // should have to sit on a particular screen for this: opening the app at all is enough, and
+    // opening the reading topic asks again in case this was cut short.
+    //
+    // The readings and their commentary go first, being what somebody plans their morning around;
+    // a page of every topic follows, so a topic never opened still reads on a plane.
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 3000));
+    idle(() => {
+      setTimeout(() => warmReadings(), 4000);
+      setTimeout(() => warmTopics(), 12000);
+    });
+  });

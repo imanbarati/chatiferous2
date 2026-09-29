@@ -219,6 +219,11 @@ function safe_url(string $url): ?string
     if (preg_match('~^(https?://|mailto:)\S+$~i', $url)) {
         return $url;
     }
+    // A path inside this app (…/bible/reading/2026-09-20). Nothing else relative is allowed, so
+    // there is no way to smuggle a scheme in.
+    if (str_starts_with($url, url()) && !str_contains($url, '//') && !str_contains($url, ':')) {
+        return $url;
+    }
     if (preg_match('~^[\w-]+(\.[\w-]+)+(/\S*)?$~', $url)) {
         return 'https://' . $url;
     }

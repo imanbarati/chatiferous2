@@ -7,7 +7,7 @@
 
 require_once APP_DIR . '/lib/bible_canon.php';
 
-// Every work in the catalogue, in reading order.
+// Every work in the catalog, in reading order.
 function commentary_works(): array
 {
     static $works = null;
@@ -86,7 +86,11 @@ function commentary_for(string $book, int $chapter, int $verse, array $works): a
         }
         foreach (commentary_chapter($code, $book, $chapter) as $key => $html) {
             [$from, $to] = commentary_range((string)$key);
-            if ($verse < $from || $verse > $to) {
+            // A verse of 0 asks for the whole chapter. The entries are all in hand here anyway, so
+            // sending them together costs the server nothing and turns a day's commentary from one
+            // request per verse into one per chapter — which is what makes it worth keeping on a
+            // device, and lighter on the host while there is a signal.
+            if ($verse > 0 && ($verse < $from || $verse > $to)) {
                 continue;
             }
             $out[] = [
@@ -94,6 +98,8 @@ function commentary_for(string $book, int $chapter, int $verse, array $works): a
                 'name'    => $work['name'],
                 'edition' => $work['edition'],
                 'years'   => $work['years'],
+                'from'    => $from,
+                'to'      => $to,
                 'verses'  => $from === $to ? (string)$from : "{$from}–{$to}",
                 'html'    => $html,
             ];
@@ -208,13 +214,16 @@ function commentary_parse_markdown(string $text): array
 
 // HTML that came from somebody else's file, reduced to the handful of tags the sheet needs. Every
 // attribute goes (there is nothing in a commentary that needs one), along with anything that could
-// carry behaviour; the text itself is kept.
+// carry behavior; the text itself is kept.
 const COMMENTARY_TAGS = ['p', 'br', 'i', 'em', 'b', 'strong', 'sup', 'sub', 'small',
     'blockquote', 'ul', 'ol', 'li', 'h3', 'h4', 'h5', 'h6', 'span', 'div', 'a', 'font'];
 const COMMENTARY_UNWRAP = ['span', 'div', 'a', 'font'];   // kept for their text, not themselves
 
 function commentary_clean_html(string $html): string
 {
+    // A module sometimes carries the scan's own figures as Markdown image links; there is no
+    // image to show, only the name of a file nobody has.
+    $html = preg_replace('/!\[[^\]]*\]\([^)]*\)/u', '', $html);
     $html = trim($html);
     if ($html === '') {
         return '';
@@ -249,10 +258,13 @@ function commentary_clean_html(string $html): string
     foreach ($xp->query('//*[@id="c"]')->item(0)->childNodes as $child) {
         $out .= $doc->saveHTML($child);
     }
-    $out = trim(preg_replace('/\s+/u', ' ', $out));
     // Words the scan set in small capitals come through a letter at a time ("G E N E S I S").
-    $out = preg_replace_callback('/\b(?:[A-Z] ){2,}[A-Z]\b/u',
+    // This happens before the spacing is tidied: where two such words meet, the only thing
+    // telling them apart is the wider gap between them ("S E C O N D<nbsp>S A M U E L"), and
+    // collapsing the spaces first would run them together.
+    $out = preg_replace_callback('/(?<![A-Za-z])(?:[A-Z] ){2,}[A-Z](?![A-Za-z])/u',
         fn($m) => str_replace(' ', '', $m[0]), $out);
+    $out = trim(preg_replace('/[\s\x{00A0}]+/u', ' ', $out));
     // Text that arrived with no paragraphs of its own still needs one.
     return $out !== '' && !preg_match('/^<(p|blockquote|ul|ol|h[3-6])\b/', $out) ? '<p>' . $out . '</p>' : $out;
 }

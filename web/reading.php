@@ -58,10 +58,12 @@ $topic = (int)setting('daily_reading_topic');
       <button type="button" data-set="theme">Background: <span data-val="theme">App</span></button>
       <button type="button" data-set="red">Red letters: <span data-val="red">Off</span></button>
       <button type="button" data-set="plain">Reading view: <span data-val="plain">Off</span></button>
+      <button type="button" data-set="commfull">Commentary: <span data-val="commfull">With the text</span></button>
       <a href="<?= url('reading/' . gmdate('Y-m-d', strtotime($date . ' -1 day'))) ?>?v=<?= h($version) ?>">The day before</a>
       <a href="<?= url('reading/' . gmdate('Y-m-d', strtotime($date . ' +1 day'))) ?>?v=<?= h($version) ?>">The day after</a>
       <a href="<?= url('bible.php') ?>">The whole Bible</a>
       <button type="button" data-copy-link>Copy link to this page</button>
+      <button type="button" data-send-reading>Send the reading to another app</button>
     </nav>
   </details>
 </header>
@@ -76,6 +78,10 @@ $topic = (int)setting('daily_reading_topic');
         <h2 class="b-ms"><?= h($p['ref']) ?></h2>
         <?= $p['html'] ?>
       <?php endforeach ?>
+      <?php $notice = bible_version_notice($version) ?>
+      <?php if ($notice !== ''): ?>
+        <p class="b-notice"><?= h($notice) ?></p>
+      <?php endif ?>
       <form method="post" class="b-finish">
         <?= csrf_field() ?>
         <?php if ($done): ?>

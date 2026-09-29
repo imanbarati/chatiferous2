@@ -20,6 +20,16 @@ function bible_version_for(int $user_id, string $asked = ''): string
 }
 
 // The versions that are actually imported, in the order they should be offered.
+require_once __DIR__ . '/api_bible.php';
+
+// Some translations are ours and some are fetched from API.Bible a chapter at a time. Anything
+// that works off the flat verse table — search, the text under a cross-reference — has no rows for
+// a fetched one, so it reads the default translation instead and says so.
+function bible_text_version(string $version): string
+{
+    return api_bible_is($version) ? bible_default_version() : $version;
+}
+
 function bible_versions(): array
 {
     static $v = null;
@@ -29,6 +39,27 @@ function bible_versions(): array
         $v = array_values(array_intersect($want, $have));
     }
     return $v;
+}
+
+// Some translations we hold are freely licensed rather than public domain, and their licence asks
+// to be named. The fetched ones carry their publisher's own line; these carry ours.
+function bible_notice(string $version): string
+{
+    return [
+        'LSV' => 'Literal Standard Version © 2020 Covenant Press, used under CC BY-SA 4.0.',
+    ][$version] ?? '';
+}
+
+// The line a translation asks to be named by. Ours that are freely licensed say so themselves;
+// the fetched ones carry their publisher's words, taken from a chapter already in hand rather than
+// from a request of its own.
+function bible_version_notice(string $version): string
+{
+    if (!api_bible_is($version)) {
+        return bible_notice($version);
+    }
+    return (string)q('SELECT copyright FROM bible_remote_chapters WHERE version = ? AND copyright <> "" LIMIT 1',
+        [$version])->fetchColumn();
 }
 
 function bible_default_version(): string
@@ -67,13 +98,25 @@ function bible_chapter(string $version, string $code, int $chapter): ?array
     if (!$book || $chapter < 1 || $chapter > (int)$book['chapters']) {
         return null;
     }
-    $html = q('SELECT html FROM bible_chapters WHERE version = ? AND book = ? AND chapter = ?',
-        [$version, $code, $chapter])->fetchColumn();
-    if ($html === false) {
-        return null;
+    $notice = '';
+    if (api_bible_is($version)) {
+        $got = api_bible_chapter($version, $code, $chapter);
+        if (!$got) {
+            return null;
+        }
+        $html = $got['html'];
+        $notice = $got['copyright'];
+        $notes = [];                      // the fetched text is asked for without them
+    } else {
+        $html = q('SELECT html FROM bible_chapters WHERE version = ? AND book = ? AND chapter = ?',
+            [$version, $code, $chapter])->fetchColumn();
+        if ($html === false) {
+            return null;
+        }
+        $notes = q('SELECT verse, kind, marker, body, refs FROM bible_notes
+                    WHERE version = ? AND book = ? AND chapter = ? ORDER BY id', [$version, $code, $chapter])->fetchAll();
+        $notice = bible_notice($version);
     }
-    $notes = q('SELECT verse, kind, marker, body, refs FROM bible_notes
-                WHERE version = ? AND book = ? AND chapter = ? ORDER BY id', [$version, $code, $chapter])->fetchAll();
     return [
         'version' => $version,
         'book'    => $code,
@@ -82,6 +125,7 @@ function bible_chapter(string $version, string $code, int $chapter): ?array
         'chapter' => $chapter,
         'chapters' => (int)$book['chapters'],
         'html'    => $html,
+        'notice'  => $notice,          // the publisher's copyright line, for a fetched translation
         'notes'   => $notes,
         'xrefs'   => bible_xref_verses($code, $chapter),
         'prev'    => bible_step($version, $code, $chapter, -1),
@@ -141,7 +185,7 @@ function bible_xrefs(string $version, string $code, int $chapter, int $verse, in
     foreach ($rows as $r) {
         $text = q('SELECT GROUP_CONCAT(text ORDER BY verse SEPARATOR " ") FROM bible_verses
                    WHERE version = ? AND book = ? AND chapter = ? AND verse BETWEEN ? AND ?',
-            [$version, $r['to_book'], $r['to_chapter'], $r['to_verse'], $r['to_end']])->fetchColumn();
+            [bible_text_version($version), $r['to_book'], $r['to_chapter'], $r['to_verse'], $r['to_end']])->fetchColumn();
         if (!$text) {
             continue;
         }
@@ -234,8 +278,13 @@ function bible_passage_html(string $version, string $book, int $chapter, int $ve
         }
         $from = ($c === $chapter && $verse) ? $verse : 1;
         $to = ($c === $end_chapter && $end_verse) ? $end_verse : 9999;
-        $out .= ($end_chapter > $chapter ? '<h3 class="b-s">' . h($ch['name'] . ' ' . $c) . '</h3>' : '')
-            . bible_slice($ch['html'], $from, $to);
+        // Wrapped, and labelled with the book and chapter it came from. A day's reading is several
+        // passages on one page, and without this everything on it — commentary, cross-references,
+        // marks — falls back to whichever chapter happened to come first.
+        $out .= '<section class="b-part" data-book="' . h($book) . '" data-chapter="' . $c . '">'
+            . ($end_chapter > $chapter ? '<h3 class="b-s">' . h($ch['name'] . ' ' . $c) . '</h3>' : '')
+            . bible_slice($ch['html'], $from, $to)
+            . '</section>';
     }
     return $out;
 }
@@ -263,7 +312,33 @@ function bible_slice(string $html, int $from, int $to): string
             $p->parentNode->removeChild($p);
         }
     }
+
+    // A heading is never empty, so the sweep above leaves it even when every verse it introduced
+    // has gone — 1 Chronicles 11:20-47 arrived under three headings belonging to verses 1 to 19.
+    // A heading is kept only if some verse still follows it before the next one does.
     $w = $doc->getElementById('w');
+    $block = [];                            // the heading being considered, and what trails it
+    $drop = [];
+    foreach (iterator_to_array($w->childNodes) as $child) {
+        if ($child->nodeType !== XML_ELEMENT_NODE) {
+            continue;
+        }
+        if ($xp->query('.//span[@class="v"]', $child)->length > 0) {
+            $block = [];                    // a verse survived under it, so the heading stays
+            continue;
+        }
+        if (in_array(strtolower($child->nodeName), ['h2', 'h3', 'h4'], true)) {
+            // One heading straight after another means the first one's verses have all gone.
+            $drop = array_merge($drop, $block);
+            $block = [$child];
+            continue;
+        }
+        $block[] = $child;                  // a reference line or a blank, belonging to the above
+    }
+    foreach (array_merge($drop, $block) as $orphan) {
+        $orphan->parentNode->removeChild($orphan);
+    }
+
     $out = '';
     foreach ($w->childNodes as $child) {
         $out .= $doc->saveHTML($child);
@@ -323,7 +398,7 @@ function bible_reading_place(int $user_id, string $date): ?array
 function bible_book_bundle(string $version, string $code): ?array
 {
     $book = bible_book($version, $code);
-    if (!$book) {
+    if (!$book || api_bible_is($version)) {
         return null;
     }
     $chapters = [];
@@ -343,70 +418,242 @@ function bible_book_bundle(string $version, string $code): ?array
 
 // ---------- search ----------
 
-// One box, three kinds of answer, in this order:
-//   a reference ("1 Jn 2", "John 3:16")   → where to go
-//   a phrase in quotation marks           → exact matches, in book order
-//   words                                 → verses holding all of them, best first
-// Scope is 'all', 'ot', 'nt' or a book code. Returns ['goto' => …, 'hits' => […], 'total' => n].
-function bible_search(string $version, string $query, string $scope = 'all', int $limit = 60): array
+// The search box. One query, over as many translations as are ticked, across whichever books are
+// chosen. What it understands:
+//
+//   John 3:16            a reference on its own — where to go, rather than what to find
+//   mercy                every verse with a word beginning "mercy": mercy, merciful, mercies
+//   faith works          both words, in any order
+//   faith OR works       either word
+//   faith -works         faith, but not where works appears
+//   "a still small voice"  those words in that order
+//   loving*              the * may be written out; a bare word gets one anyway
+//
+// Only translations we hold are searched. The ones read from API.Bible are excluded here and in
+// the panel that calls this: their text is theirs, fetched a chapter at a time as it is read.
+function bible_searchable_versions(): array
 {
-    require_once APP_DIR . '/lib/bible_refs.php';
-    $query = trim(preg_replace('/\s+/u', ' ', $query));
-    if ($query === '') {
-        return ['goto' => null, 'hits' => [], 'total' => 0];
-    }
+    return array_values(array_diff(bible_versions(), api_bible_versions()));
+}
 
-    // A reference on its own goes straight there.
-    $goto = null;
-    $refs = bible_find_refs($query);
-    if ($refs && $refs[0]['length'] >= strlen($query) - 2 && bible_book($version, $refs[0]['book'])) {
-        $r = $refs[0];
-        $goto = ['book' => $r['book'], 'chapter' => $r['chapter'], 'verse' => $r['verse'], 'ref' => $r['ref']];
-    }
+// A query in the little language above, as one MySQL boolean-mode expression.
+// Returns [expression, [phrases to confirm literally], [the words being looked for]].
+function bible_boolean(string $query): array
+{
+    // Split into terms, keeping quoted phrases whole.
+    preg_match_all('/(-|NOT\s+)?"([^"]+)"|(-|NOT\s+)?(\S+)/ui', $query, $m, PREG_SET_ORDER);
 
-    $phrase = preg_match('/^"(.+)"$/u', $query, $m) ? $m[1] : null;
-    $words = array_values(array_filter(preg_split('/[^\p{L}\p{N}\']+/u', $phrase ?? $query), fn($w) => mb_strlen($w) > 1));
-    if (!$words) {
-        return ['goto' => $goto, 'hits' => [], 'total' => 0];
-    }
-
-    [$where, $args] = bible_scope_sql($scope);
-    array_unshift($args, $version);
-
-    // Full-text first (fast, ranked), then the phrase is confirmed literally: the index doesn't
-    // know about word order.
-    $boolean = $phrase !== null
-        ? '"' . str_replace('"', '', $phrase) . '"'
-        : implode(' ', array_map(fn($w) => '+' . str_replace(['+', '-', '*', '(', ')', '~', '<', '>'], '', $w), $words));
-    $sql = 'SELECT book, chapter, verse, text, MATCH(text) AGAINST (? IN BOOLEAN MODE) score
-            FROM bible_verses WHERE version = ?' . $where . '
-              AND MATCH(text) AGAINST (? IN BOOLEAN MODE)
-            ORDER BY score DESC, book, chapter, verse LIMIT ?';
-    $rows = q($sql, array_merge([$boolean], $args, [$boolean, $limit * 2]))->fetchAll();
-
-    $names = array_column(bible_books($version), 'name', 'code');
-    $hits = [];
-    foreach ($rows as $r) {
-        if ($phrase !== null && mb_stripos($r['text'], $phrase) === false) {
-            continue;                      // the index matched the words, not the phrase
+    $groups = [[]];              // terms, split into OR-groups
+    $phrases = [];
+    $terms = [];                 // what a verse is scored on: the words asked for, not the excluded
+    foreach ($m as $t) {
+        $raw = $t[2] !== '' ? $t[2] : ($t[4] ?? '');
+        $neg = trim(($t[1] ?? '') . ($t[3] ?? '')) !== '';
+        $quoted = $t[2] !== '';
+        if (!$quoted && preg_match('/^(OR|\|\|)$/i', $raw)) {
+            $groups[] = [];       // what follows is an alternative
+            continue;
         }
+        if (!$quoted && preg_match('/^AND$/i', $raw)) {
+            continue;             // the default already
+        }
+        if ($quoted) {
+            $clean = str_replace('"', '', $raw);
+            if (trim($clean) === '') {
+                continue;
+            }
+            if (!$neg) {
+                $phrases[] = $clean;
+                $terms[] = $clean;
+            }
+            $groups[count($groups) - 1][] = ($neg ? '-' : '+') . '"' . $clean . '"';
+            continue;
+        }
+        // A bare word: strip what boolean mode would read as an operator, then make it a prefix,
+        // so "descen" finds descend, descended and descendants without anyone typing a star.
+        $word = str_replace(['+', '-', '(', ')', '~', '<', '>', '@', '"'], '', $raw);
+        $word = rtrim($word, '*');
+        if (mb_strlen($word) < 2) {
+            continue;
+        }
+        if (!$neg) {
+            $terms[] = $word;
+        }
+        $groups[count($groups) - 1][] = ($neg ? '-' : '+') . $word . '*';
+    }
+
+    $groups = array_values(array_filter($groups, fn($g) => (bool)$g));
+    $terms = array_values(array_unique($terms));
+    if (!$groups) {
+        return ['', [], []];
+    }
+    if (count($groups) === 1) {
+        return [implode(' ', $groups[0]), $phrases, $terms];
+    }
+    // Several alternatives: each becomes an optional group, and a row matching any of them counts.
+    return [implode(' ', array_map(fn($g) => '(' . implode(' ', $g) . ')', $groups)), $phrases, $terms];
+}
+
+// The verses a reference names, as each translation has them, in the shape search results take.
+// A reference with no verse ("John 3") means the whole chapter.
+function bible_passage_hits(array $versions, array $ref, string $first, int $limit): array
+{
+    if (!$versions) {
+        return [];
+    }
+    $code = $ref['book'];
+    $c1 = (int)$ref['chapter'];
+    $v1 = (int)$ref['verse'] ?: 1;
+    $c2 = (int)($ref['end_chapter'] ?? $c1) ?: $c1;
+    $v2 = (int)($ref['end_verse'] ?? 0) ?: ((int)$ref['verse'] ? (int)$ref['verse'] : 9999);
+    if ($c2 > $c1 && !(int)($ref['end_verse'] ?? 0)) {
+        $v2 = 9999;
+    }
+
+    $in = implode(',', array_fill(0, count($versions), '?'));
+    $rows = q("SELECT version, chapter, verse, text FROM bible_verses
+               WHERE version IN ($in) AND book = ?
+                 AND (chapter > ? OR (chapter = ? AND verse >= ?))
+                 AND (chapter < ? OR (chapter = ? AND verse <= ?))
+               ORDER BY chapter, verse",
+        array_merge($versions, [$code, $c1, $c1, $v1, $c2, $c2, $v2]))->fetchAll();
+    if (!$rows) {
+        return [];
+    }
+
+    $order = array_flip(bible_searchable_versions());
+    $names = array_column(bible_books($first), 'name', 'code');
+    $by = [];
+    foreach ($rows as $r) {
+        $by[(int)$r['chapter'] . '.' . (int)$r['verse']][$r['version']] = $r['text'];
+    }
+    $hits = [];
+    foreach ($by as $key => $texts) {
+        [$c, $v] = array_map('intval', explode('.', $key));
+        uksort($texts, fn($a, $b) => ($order[$a] ?? 99) <=> ($order[$b] ?? 99));
+        $shown = array_key_first($texts);
         $hits[] = [
-            'book' => $r['book'], 'chapter' => (int)$r['chapter'], 'verse' => (int)$r['verse'],
-            'ref' => ($names[$r['book']] ?? $r['book']) . ' ' . $r['chapter'] . ':' . $r['verse'],
-            'text' => $r['text'],
+            'book' => $code, 'chapter' => $c, 'verse' => $v,
+            'ref' => ($names[$code] ?? $code) . ' ' . $c . ':' . $v,
+            'version' => $shown,
+            'versions' => array_keys($texts),
+            'text' => $texts[$shown],
+            'texts' => $texts,
         ];
         if (count($hits) >= $limit) {
             break;
         }
     }
-    // Word searches read better in book order; ranked order matters only for choosing which to show.
-    usort($hits, fn($a, $b) => [bible_book_order($version, $a['book']), $a['chapter'], $a['verse']]
-        <=> [bible_book_order($version, $b['book']), $b['chapter'], $b['verse']]);
-    return ['goto' => $goto, 'hits' => $hits, 'total' => count($hits), 'words' => $phrase !== null ? [$phrase] : $words];
+    return $hits;
 }
 
-function bible_scope_sql(string $scope): array
+function bible_term_count(string $text, array $terms): int
 {
+    $n = 0;
+    foreach ($terms as $t) {
+        $pattern = str_contains($t, ' ')
+            ? '/' . preg_quote($t, '/') . '/iu'              // a phrase, as written
+            : '/\b' . preg_quote($t, '/') . '\w*/iu';       // a word, and the words it begins
+        $n += preg_match_all($pattern, $text);
+    }
+    return $n;
+}
+
+// $versions: one code or several. $scope: 'all', 'ot', 'nt', a book code, or a list of book codes.
+// Returns ['goto' => …, 'hits' => […], 'total' => n, 'versions' => […], 'unsearchable' => […]].
+function bible_search($versions, string $query, $scope = 'all', int $limit = 60): array
+{
+    require_once APP_DIR . '/lib/bible_refs.php';
+    $asked = array_values(array_unique((array)$versions));
+    $wanted = array_values(array_intersect($asked, bible_searchable_versions()));
+    $unsearchable = array_values(array_intersect($asked, api_bible_versions()));
+    $none = ['goto' => null, 'hits' => [], 'total' => 0, 'versions' => $wanted, 'unsearchable' => $unsearchable];
+
+    $query = trim(preg_replace('/\s+/u', ' ', $query));
+    if ($query === '' || !$wanted) {
+        return $none;
+    }
+    $first = $wanted[0];
+
+    // A reference on its own is a request for those words, not for a link to them.
+    $refs = bible_find_refs($query);
+    $ref = ($refs && $refs[0]['length'] >= strlen($query) - 2 && bible_book($first, $refs[0]['book'])) ? $refs[0] : null;
+    $goto = $ref ? ['book' => $ref['book'], 'chapter' => $ref['chapter'], 'verse' => $ref['verse'], 'ref' => $ref['ref']] : null;
+
+    // "Jn 3:16", "John 3:16-18", "John 3:16-4:2", or a whole chapter: the verses themselves, in
+    // every translation that has them, each with its names to swap between.
+    if ($ref) {
+        $hits = bible_passage_hits($wanted, $ref, $first, $limit);
+        if ($hits) {
+            return ['goto' => null, 'hits' => $hits, 'total' => count($hits),
+                    'versions' => $wanted, 'unsearchable' => $unsearchable, 'words' => []];
+        }
+    }
+
+    [$boolean, $phrases, $terms] = bible_boolean($query);
+    if ($boolean === '') {
+        return ['goto' => $goto] + $none;
+    }
+
+    [$where, $args] = bible_scope_sql($scope);
+    $vin = implode(',', array_fill(0, count($wanted), '?'));
+    $sql = 'SELECT version, book, chapter, verse, text, MATCH(text) AGAINST (? IN BOOLEAN MODE) score
+            FROM bible_verses WHERE version IN (' . $vin . ')' . $where . '
+              AND MATCH(text) AGAINST (? IN BOOLEAN MODE)
+            ORDER BY score DESC, book, chapter, verse LIMIT ?';
+    // Room for the same verse from every translation asked for, since they collapse into one hit.
+    $rows = q($sql, array_merge([$boolean], $wanted, $args, [$boolean, $limit * count($wanted) * 2]))->fetchAll();
+
+    // One verse, one hit, however many translations it turned up in. The wording shown is the one
+    // that uses the words most often; where two use them equally the KJV wins, and failing that the
+    // order the translations are listed in. The rest are named beside it, to be read there instead.
+    $names = array_column(bible_books($first), 'name', 'code');
+    $order = array_flip(bible_searchable_versions());      // KJV, WEB, BSB — the tie-break
+    $found = [];
+    foreach ($rows as $r) {
+        foreach ($phrases as $ph) {
+            if (mb_stripos($r['text'], $ph) === false) {
+                continue 2;                // the index matched the words, not their order
+            }
+        }
+        $key = $r['book'] . '.' . (int)$r['chapter'] . '.' . (int)$r['verse'];
+        $found[$key] ??= ['book' => $r['book'], 'chapter' => (int)$r['chapter'], 'verse' => (int)$r['verse'], 'in' => []];
+        $found[$key]['in'][$r['version']] = ['text' => $r['text'], 'n' => bible_term_count($r['text'], $terms)];
+    }
+
+    $hits = [];
+    foreach ($found as $f) {
+        $in = $f['in'];
+        uksort($in, fn($a, $b) => [-$in[$a]['n'], $order[$a] ?? 99] <=> [-$in[$b]['n'], $order[$b] ?? 99]);
+        $shown = array_key_first($in);
+        $hits[] = [
+            'book' => $f['book'], 'chapter' => $f['chapter'], 'verse' => $f['verse'],
+            'ref' => ($names[$f['book']] ?? $f['book']) . ' ' . $f['chapter'] . ':' . $f['verse'],
+            'version' => $shown,                 // whose wording is shown to begin with
+            'versions' => array_keys($in),       // every one it appears in, that one first
+            'text' => $in[$shown]['text'],
+            // Each one's wording, so tapping a name swaps the words underneath without asking again.
+            'texts' => array_map(fn($x) => $x['text'], $in),
+        ];
+    }
+    usort($hits, fn($a, $b) => [bible_book_order($first, $a['book']), $a['chapter'], $a['verse']]
+        <=> [bible_book_order($first, $b['book']), $b['chapter'], $b['verse']]);
+    $hits = array_slice($hits, 0, $limit);
+    return ['goto' => $goto, 'hits' => $hits, 'total' => count($hits),
+            'versions' => $wanted, 'unsearchable' => $unsearchable,
+            'words' => $phrases ?: array_map(fn($t) => ltrim(rtrim($t, '*'), '+-()"'), explode(' ', $boolean))];
+}
+
+function bible_scope_sql($scope): array
+{
+    // A list of books chosen by hand.
+    if (is_array($scope)) {
+        $codes = array_values(array_filter($scope, fn($c) => isset(BIBLE_CANON[$c])));
+        if (!$codes || count($codes) === count(BIBLE_CANON)) {
+            return ['', []];
+        }
+        return [' AND book IN (' . implode(',', array_fill(0, count($codes), '?')) . ')', $codes];
+    }
     if ($scope === 'ot' || $scope === 'nt') {
         $codes = array_keys(array_filter(BIBLE_CANON, fn($c) => $c[3] === $scope));
         return [' AND book IN (' . implode(',', array_fill(0, count($codes), '?')) . ')', $codes];

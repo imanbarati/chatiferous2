@@ -1,5 +1,5 @@
 <?php
-// The catalogue: which commentaries the app carries, in the order they're offered.
+// The catalog: which commentaries the app carries, in the order they're offered.
 //
 // Every one of these is out of copyright in the United States (published before 1930, and in most
 // cases well before). Works whose status isn't plain are marked 'check' and are not imported
@@ -8,7 +8,7 @@
 //
 // scope: all | ot | nt | some — what the work covers, so the list can say when it has nothing.
 
-const COMMENTARY_CATALOGUE = [
+const COMMENTARY_CATALOG = [
     // code             name                                  edition / full title
     ['mhcw', 'Matthew Henry (Full)', 'Commentary on the Whole Bible', 'Matthew Henry', '1708–10', 'all', 10],
     ['mhc', 'Matthew Henry (Concise)', 'Concise Commentary on the Bible', 'Matthew Henry', '1708–10', 'all', 11],
@@ -51,22 +51,23 @@ const COMMENTARY_CATALOGUE = [
     // copyright, unlike the modern compilations that go by the same title.
     ['catena', 'Catena Aurea (the Fathers)', 'Catena Aurea, tr. J. H. Newman, 1842', 'Thomas Aquinas', '1842', 'some', 50],
 
-    // Still held back: Newell's Romans (1938) and Revelation (1935) appear never to have had their
-    // copyright renewed, which would put them in the public domain, but that rests on a search for
-    // something absent rather than on a date — Larry's call, not the app's.
+    // Left out by Larry's decision (2026-09-20). Newell's Romans (1938) and Revelation (1935)
+    // appear never to have had their copyright renewed, which would put them in the public domain,
+    // but that rests on a search finding nothing rather than on a date, and his Hebrews (1947) was
+    // renewed. Not worth the doubt.
     ['newell', 'Newell', 'Verse-by-Verse Commentary', 'William R. Newell', '1935–38', 'some', 53, 'check'],
 ];
 
-// The catalogue as rows ready for the database.
-function commentary_catalogue(): array
+// The catalog as rows ready for the database.
+function commentary_catalog(): array
 {
     $out = [];
-    foreach (COMMENTARY_CATALOGUE as $row) {
+    foreach (COMMENTARY_CATALOG as $row) {
         [$code, $name, $edition, $author, $years, $scope, $sort] = $row;
         $out[] = [
             'code' => $code, 'name' => $name, 'edition' => $edition, 'author' => $author,
             'years' => $years, 'scope' => $scope, 'sort' => $sort,
-            'licence' => ($row[7] ?? '') === 'check' ? 'Status to be checked' : 'Public domain',
+            'license' => ($row[7] ?? '') === 'check' ? 'Status to be checked' : 'Public domain',
         ];
     }
     return $out;
@@ -75,5 +76,5 @@ function commentary_catalogue(): array
 // Works whose copyright hasn't been settled, which the importer leaves alone.
 function commentary_unchecked(): array
 {
-    return array_values(array_map(fn($r) => $r[0], array_filter(COMMENTARY_CATALOGUE, fn($r) => ($r[7] ?? '') === 'check')));
+    return array_values(array_map(fn($r) => $r[0], array_filter(COMMENTARY_CATALOG, fn($r) => ($r[7] ?? '') === 'check')));
 }

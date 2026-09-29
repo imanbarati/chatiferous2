@@ -7,7 +7,7 @@
 
 require_once APP_DIR . '/lib/bible_canon.php';
 
-const BIBLE_MARK_COLOURS = ['yellow', 'green', 'blue', 'pink', 'orange'];
+const BIBLE_MARK_COLORS = ['yellow', 'green', 'blue', 'pink', 'orange'];
 const BIBLE_NOTE_MAX = 4000;
 
 // A passage as plain words: no verse numbers, no note markers, nothing to trip up a reader or a
@@ -20,7 +20,7 @@ function bible_mark_text(string $version, array $m): string
 }
 
 // Every mark, or just one chapter's. Newest first within a verse, so the reader shows the last
-// colour chosen.
+// color chosen.
 function bible_marks(int $user_id, ?string $book = null, ?int $chapter = null): array
 {
     $where = 'user_id = ?';
@@ -33,7 +33,7 @@ function bible_marks(int $user_id, ?string $book = null, ?int $chapter = null): 
             $args[] = $chapter;
         }
     }
-    $rows = q("SELECT id, kind, book, chapter, verse, end_verse, colour, body, version,
+    $rows = q("SELECT id, kind, book, chapter, verse, end_verse, color, body, version,
                       UNIX_TIMESTAMP(created_at) AS created_at, UNIX_TIMESTAMP(updated_at) AS updated_at
                FROM bible_marks WHERE $where ORDER BY id", $args)->fetchAll();
     foreach ($rows as &$r) {
@@ -78,9 +78,9 @@ function bible_mark_clean(array $in): ?array
     if ($chapter < 1 || $chapter > $chapters || $verse < 1 || $verse > 200 || $end > 200) {
         return null;
     }
-    $colour = (string)($in['colour'] ?? '');
-    if ($kind === 'highlight' && !in_array($colour, BIBLE_MARK_COLOURS, true)) {
-        $colour = BIBLE_MARK_COLOURS[0];
+    $color = (string)($in['color'] ?? '');
+    if ($kind === 'highlight' && !in_array($color, BIBLE_MARK_COLORS, true)) {
+        $color = BIBLE_MARK_COLORS[0];
     }
     $body = trim((string)($in['body'] ?? ''));
     if ($kind === 'note' && $body === '') {
@@ -88,14 +88,14 @@ function bible_mark_clean(array $in): ?array
     }
     return [
         'kind' => $kind, 'book' => $book, 'chapter' => $chapter, 'verse' => $verse,
-        'end_verse' => $end, 'colour' => $kind === 'highlight' ? $colour : '',
+        'end_verse' => $end, 'color' => $kind === 'highlight' ? $color : '',
         'body' => mb_substr($body, 0, BIBLE_NOTE_MAX),
         'version' => preg_replace('/[^A-Z0-9]/', '', strtoupper((string)($in['version'] ?? ''))),
     ];
 }
 
 // Marking a verse. A second highlight or bookmark on the same verses replaces the first (so
-// choosing another colour changes the colour rather than stacking), and so does a second note.
+// choosing another color changes the color rather than stacking), and so does a second note.
 function bible_mark_set(int $user_id, array $in): ?array
 {
     $m = bible_mark_clean($in);
@@ -103,10 +103,10 @@ function bible_mark_set(int $user_id, array $in): ?array
         return null;
     }
     bible_mark_clear($user_id, $m['kind'], $m['book'], $m['chapter'], $m['verse'], $m['end_verse']);
-    q('INSERT INTO bible_marks (user_id, kind, book, chapter, verse, end_verse, colour, body, version)
+    q('INSERT INTO bible_marks (user_id, kind, book, chapter, verse, end_verse, color, body, version)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [$user_id, $m['kind'], $m['book'], $m['chapter'], $m['verse'], $m['end_verse'],
-         $m['colour'], $m['body'], $m['version']]);
+         $m['color'], $m['body'], $m['version']]);
     $id = (int)db()->lastInsertId();
     foreach (bible_marks($user_id, $m['book'], $m['chapter']) as $row) {
         if ($row['id'] === $id) {
@@ -144,7 +144,7 @@ function bible_marks_markdown(int $user_id, string $version): string
         }
         $text = bible_mark_text($version, $m);
         $label = ['highlight' => 'Highlight', 'bookmark' => 'Bookmark', 'note' => 'Note'][$m['kind']];
-        $out .= "\n### {$m['ref']}" . ($m['colour'] ? " · {$m['colour']}" : '') . "\n\n";
+        $out .= "\n### {$m['ref']}" . ($m['color'] ? " · {$m['color']}" : '') . "\n\n";
         $out .= "*$label* — " . gmdate('j M Y', $m['created_at']) . "\n\n";
         if ($text !== '') {
             $out .= '> ' . $text . "\n\n";
@@ -162,7 +162,7 @@ function bible_marks_json(int $user_id): string
         'app' => 'chatiferous-bible-marks', 'v' => 1, 'exported' => gmdate('c'),
         'marks' => array_map(fn($m) => [
             'kind' => $m['kind'], 'book' => $m['book'], 'chapter' => $m['chapter'],
-            'verse' => $m['verse'], 'end_verse' => $m['end_verse'], 'colour' => $m['colour'],
+            'verse' => $m['verse'], 'end_verse' => $m['end_verse'], 'color' => $m['color'],
             'body' => $m['body'], 'version' => $m['version'], 'created' => gmdate('c', $m['created_at']),
         ], bible_marks_ordered($user_id)),
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -185,10 +185,10 @@ function bible_marks_import(int $user_id, string $json): int
         if ($there !== false) {
             continue;
         }
-        q('INSERT INTO bible_marks (user_id, kind, book, chapter, verse, end_verse, colour, body, version)
+        q('INSERT INTO bible_marks (user_id, kind, book, chapter, verse, end_verse, color, body, version)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [$user_id, $m['kind'], $m['book'], $m['chapter'], $m['verse'], $m['end_verse'],
-             $m['colour'], $m['body'], $m['version']]);
+             $m['color'], $m['body'], $m['version']]);
         $added++;
     }
     return $added;

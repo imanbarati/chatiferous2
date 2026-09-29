@@ -39,7 +39,7 @@ $callback = 'https://' . $_SERVER['HTTP_HOST'] . url('auth/telegram-callback.php
 page_start('Sign in', ['bare' => true, 'main_class' => 'center']);
 ?>
 <div class="card signin">
-  <div class="group-avatar" aria-hidden="true"><?= h(config('group_emoji')) ?></div>
+  <?= group_avatar() ?>
   <h1><?= h(config('group_name')) ?></h1>
   <p class="muted">Members only.</p>
   <?php notice($error, 'error') ?>

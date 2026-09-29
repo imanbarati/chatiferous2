@@ -77,7 +77,7 @@
     if (bottom) scroller.scrollTop = scroller.scrollHeight;
   }
 
-  // The small grey lines in the middle: topic created or renamed, message pinned, keys changed.
+  // The small gray lines in the middle: topic created or renamed, message pinned, keys changed.
   function serviceHtml(m) {
     const u = state.users[m.user_id] || { name: 'Someone' };
     const s = m.service || {};
@@ -164,8 +164,11 @@
       }
       const faces = !p.anonymous && o.voters?.length
         ? `<span class="opt-voters" aria-hidden="true">${o.voters.slice(0, 3).map((id) => avatar(id, 'xs')).join('')}</span>` : '';
-      return `<div class="opt ${o.mine ? 'mine' : ''}"><span class="pct">${pct}%</span>`
-        + `<span class="opt-body"><span class="opt-text">${label}${o.mine ? ' <span class="my-vote">Your vote</span>' : ''}</span>`
+      // The mark sits in its own column, present on every row so the percentages stay in line;
+      // only your own is filled in. The word is for screen readers, which can't see the dot.
+      return `<div class="opt ${o.mine ? 'mine' : ''}"><span class="opt-mark" aria-hidden="true"></span>`
+        + `<span class="pct">${pct}%</span>`
+        + `<span class="opt-body"><span class="opt-text">${label}${o.mine ? '<span class="sr-only"> (your vote)</span>' : ''}</span>`
         + `<span class="bar-track"><span class="bar-fill" data-pct="${pct}"></span></span></span>${faces}</div>`;
     }).join('');
     const votes = p.total === 1 ? '1 vote' : `${p.total} votes`;
@@ -230,6 +233,7 @@
     loadPreviews();
     loadSealedFiles();
     linkBibleRefs(list);
+    liftReadingLink(list);
     for (const bar of list.querySelectorAll('.bar-fill')) bar.style.width = bar.dataset.pct + '%';
     renderPinbar();
     renderMentionButton();
@@ -334,7 +338,27 @@
     chatShell(t);
     renderTopics();
     bindChat();
-    const data = await api('messages.php', jumpTo ? { topic: id, mode: 'around', id: jumpTo } : { topic: id });
+    let data;
+    try {
+      data = await api('messages.php', jumpTo ? { topic: id, mode: 'around', id: jumpTo } : { topic: id });
+      // Kept as it arrived, before the sealed direct messages are opened: what goes on the device is
+      // what the server sent, not the plain text of anybody's private conversation. Only the plain
+      // page is worth keeping — a jump to one message is a page around it, not where reading resumes.
+      if (!jumpTo) localSave('t:' + id, data);
+    } catch (e) {
+      if (e.name !== 'NoSignal') throw e;
+      data = await localLoad('t:' + id);
+      if (state.view?.topic.id !== id) return;
+      if (!data) {
+        const list = $('.messages', chatEl);
+        if (list) {
+          list.innerHTML = '<div class="service"><span class="chip">No connection, '
+            + 'and this topic hasn’t been read on this device yet.</span></div>';
+        }
+        initComposer();
+        return;
+      }
+    }
     if (state.view?.topic.id !== id) return;
     await openSealed(data.topic, data.messages);   // a DM: opened on this device
     await openPins(data.topic, data.pins);
@@ -346,6 +370,7 @@
     bindChat();
     initComposer();
     renderMessages({ jump: jumpTo || 0 });
+    if (APP.readingTopic && id === APP.readingTopic) warmReadings();
     // A link to one message (e.g. from a notification) has done its job: drop the message
     // from the address, so a later reload or app restart doesn't jump back to it.
     if (jumpTo && location.pathname !== `${APP.base}t/${id}`) history.replaceState(history.state, '', `${APP.base}t/${id}`);
@@ -392,6 +417,7 @@
       applyPage(data, dir);
       renderMessages({ keep: true });
       if (dir === 'older') scroller.scrollTop = oldTop + (scroller.scrollHeight - oldHeight);
+      keepView();          // the copy should hold what has been read, not only the first page
     } finally {
       state.loading = false;
     }

@@ -172,8 +172,14 @@ function usfm_inline(string $s, array &$notes, int &$letters, int $verse): array
     $s = preg_replace('/\\\\\+?[a-z0-9]+\*?\s?/u', '', $s);
 
     $html = trim(preg_replace('/\s+/u', ' ', $s));
-    // The plain text is for search and for quoting: note markers are not part of the verse.
+    // The Literal Standard Version marks a new line of poetry inside a verse with || — it sets its
+    // poetry in ordinary paragraphs and leans on that instead of USFM's \q lines. Shown as written
+    // it is a row of pipes through the Psalms, so it becomes the line break it stands for.
+    $html = preg_replace('/\s*\|\|\s*/u', '<br>', $html);
+    // The plain text is for search and for quoting: note markers are not part of the verse, and a
+    // line break is a space.
     $plain = preg_replace('/<sup class="(?:fn|xr)"[^>]*>.*?<\/sup>/us', '', $html);
+    $plain = str_replace('<br>', ' ', $plain);
     $plain = trim(preg_replace('/\s+/u', ' ', strip_tags($plain)));
     return [$html, $plain];
 }

@@ -118,7 +118,50 @@ check('search: one book', $where === ' AND book = ?' && $args === ['PSA']);
 [$where, $args] = bible_scope_sql('nonsense');
 check('search: an unknown scope searches everything', $where === '' && $args === []);
 check('offline: no such book, nothing to download', bible_book_bundle('KJV', 'NOPE') === null);
-check('search: nothing typed, nothing done', bible_search('KJV', '   ') === ['goto' => null, 'hits' => [], 'total' => 0]);
+$empty = bible_search('KJV', '   ');
+check('search: nothing typed, nothing done', $empty['goto'] === null && $empty['hits'] === [] && $empty['total'] === 0);
+
+// The query language: words are prefixes and all required, OR takes either, - excludes, and
+// "quoted words" are confirmed in order.
+[$b, $ph] = bible_boolean('faith works');
+check('search: two words are both required', $b === '+faith* +works*' && $ph === []);
+[$b, $ph] = bible_boolean('faith OR works');
+check('search: OR takes either', $b === '(+faith*) (+works*)' && $ph === []);
+[$b, $ph] = bible_boolean('faith -works');
+check('search: a leading minus excludes', $b === '+faith* -works*');
+[$b, $ph] = bible_boolean('"still small voice"');
+check('search: a quoted phrase is kept whole', $b === '+"still small voice"' && $ph === ['still small voice']);
+[$b] = bible_boolean('descen');
+check('search: part of a word finds the rest of it', $b === '+descen*');
+check('search: a list of books narrows the scope',
+    bible_scope_sql(['PSA', 'JHN']) === [' AND book IN (?,?)', ['PSA', 'JHN']]);
+check('search: the fetched translations are never searched',
+    !array_intersect(bible_searchable_versions(), api_bible_versions()));
+// Only where a key is configured is NASB a version at all; without one it is simply unknown,
+// and either way searching it finds nothing.
+$off = bible_search(['NASB'], 'shepherd');
+check('search: asking for one of them finds nothing and says so',
+    $off['hits'] === [] && $off['unsearchable'] === (api_bible_is('NASB') ? ['NASB'] : []));
+
+// ============ Links inside the app ============
+require_once APP_DIR . '/lib/compose.php';
+require_once APP_DIR . '/lib/previews.php';
+check('links: an ordinary link is kept', safe_url('https://example.com/x') === 'https://example.com/x');
+check('links: a bare host gets https', safe_url('example.com/x') === 'https://example.com/x');
+check('links: a path inside the app is allowed', safe_url(url('reading/2026-09-20')) === url('reading/2026-09-20'));
+check('links: javascript is refused', safe_url('javascript:alert(1)') === null);
+check('links: a path elsewhere on the host is refused', safe_url('/etc/passwd') === null);
+check('links: a protocol-relative link is refused', safe_url('//evil.example/x') === null);
+check('links: the app makes no preview card of itself', preview_normalize(url('reading/2026-09-20')) === null);
+check('links: an outside link still gets a card', preview_normalize('https://example.com/') === 'https://example.com/');
+
+// The day's reading points at the page built for that day — where there is a reader to point at.
+require_once APP_DIR . '/lib/reading.php';
+$day = reading_text('2026-09-20', ['2 Samuel 8:1-18 | Psalm 60']);
+check('reading: the passages are there', str_contains($day, '2 Samuel 8:1-18'));
+$link = str_contains($day, '[Read](' . url('reading/2026-09-20') . ')');
+check('reading: a link to the day\'s own page, when the reader is switched on',
+    $link === (bool)config('bible_reader'));
 
 // ============ Commentaries ============
 require_once APP_DIR . '/lib/commentary.php';
@@ -130,6 +173,12 @@ check('commentary: paragraphs become paragraphs', substr_count($parsed['1'], '<p
 check('commentary: the repeated range line is dropped', !str_contains($parsed['33-36'], 'Verses 33-36'));
 check('commentary: a range covers the verses inside it', commentary_range('33-36') === [33, 36]);
 check('commentary: a single verse is its own range', commentary_range('7') === [7, 7]);
+check('commentary: small capitals are put back together',
+    commentary_clean_html('<p>G E N E S I S</p>') === '<p>GENESIS</p>');
+check('commentary: two such words keep the space between them',
+    commentary_clean_html("<p>S E C O N D \u{00A0} S A M U E L</p>") === '<p>SECOND SAMUEL</p>');
+check('commentary: an ordinary capital is left alone',
+    str_contains(commentary_html('W. R. Newell wrote'), 'W. R. Newell'));
 check('commentary: markup in the text is escaped', str_contains(commentary_html('a <script>b</script> c'), '&lt;script&gt;'));
 check('commentary: italics survive', str_contains(commentary_html('the *Greek* word'), '<em>Greek</em>'));
 $verse = 'for god so loved the world that he gave his only begotten son that whosoever believeth in him should not perish but have everlasting life';
@@ -144,17 +193,17 @@ check('commentary: a passage of several verses is dropped', drop_reprinted_passa
     [1 => 'there was a man of the', 2 => 'the same came to jesus by'], []) === '<p>Observe, I. Who this was.</p>');
 check('commentary: an entry is never left empty',
     drop_reprinted_passage("<p>$verse</p>", $opens, [16 => $verse]) === "<p>$verse</p>");
-check('commentary: the catalogue has every work Larry listed', count(commentary_catalogue()) >= 31);
+check('commentary: the catalog has every work Larry listed', count(commentary_catalog()) >= 31);
 check('commentary: works of doubtful standing are held back', commentary_unchecked() === ['newell']);
 
 // ============ Bible marks ============
 require_once APP_DIR . '/lib/bible_marks.php';
 $clean = fn(array $in) => bible_mark_clean($in);
-check('marks: a highlight is tidied', $clean(['kind' => 'highlight', 'book' => 'jhn', 'chapter' => 3, 'verse' => 16, 'colour' => 'green'])
-    === ['kind' => 'highlight', 'book' => 'JHN', 'chapter' => 3, 'verse' => 16, 'end_verse' => 16, 'colour' => 'green', 'body' => '', 'version' => '']);
-check('marks: an unknown colour becomes the first one', $clean(['kind' => 'highlight', 'book' => 'JHN', 'chapter' => 3, 'verse' => 16, 'colour' => 'puce'])['colour'] === 'yellow');
+check('marks: a highlight is tidied', $clean(['kind' => 'highlight', 'book' => 'jhn', 'chapter' => 3, 'verse' => 16, 'color' => 'green'])
+    === ['kind' => 'highlight', 'book' => 'JHN', 'chapter' => 3, 'verse' => 16, 'end_verse' => 16, 'color' => 'green', 'body' => '', 'version' => '']);
+check('marks: an unknown color becomes the first one', $clean(['kind' => 'highlight', 'book' => 'JHN', 'chapter' => 3, 'verse' => 16, 'color' => 'puce'])['color'] === 'yellow');
 check('marks: a note needs something written in it', $clean(['kind' => 'note', 'book' => 'JHN', 'chapter' => 3, 'verse' => 16, 'body' => '  ']) === null);
-check('marks: a bookmark keeps no colour', $clean(['kind' => 'bookmark', 'book' => 'JHN', 'chapter' => 3, 'verse' => 16, 'colour' => 'green'])['colour'] === '');
+check('marks: a bookmark keeps no color', $clean(['kind' => 'bookmark', 'book' => 'JHN', 'chapter' => 3, 'verse' => 16, 'color' => 'green'])['color'] === '');
 check('marks: a chapter the book hasn\'t got is refused', $clean(['kind' => 'bookmark', 'book' => 'JUD', 'chapter' => 2, 'verse' => 1]) === null);
 check('marks: an unknown book is refused', $clean(['kind' => 'bookmark', 'book' => 'XYZ', 'chapter' => 1, 'verse' => 1]) === null);
 check('marks: a backwards range is put right', $clean(['kind' => 'highlight', 'book' => 'PSA', 'chapter' => 23, 'verse' => 4, 'end_verse' => 2])['end_verse'] === 4);
@@ -363,7 +412,7 @@ q('UPDATE invite_codes SET expires_at = UTC_TIMESTAMP() - INTERVAL 1 MINUTE WHER
 check('invite: expired link refused', usable_invite($exp) === null);
 $rev = new_invite($owner, null, '', 1, 14);
 q('UPDATE invite_codes SET revoked_at = UTC_TIMESTAMP() WHERE code = ?', [$rev]);
-check('invite: cancelled link refused', usable_invite($rev) === null);
+check('invite: canceled link refused', usable_invite($rev) === null);
 check('invite: junk code refused', usable_invite('../../etc/passwd') === null);
 q("INSERT INTO users (display_name, telegram_id, status) VALUES ('Imported Irene', 987654, 'unclaimed')");
 $irene = (int)db()->lastInsertId();

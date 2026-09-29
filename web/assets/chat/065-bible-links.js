@@ -40,7 +40,9 @@
     names.sort((a, b) => b[0].length - a[0].length);     // "song of solomon" before "song"
     const alt = names.map(([a]) => a).join('|');
     return {
-      re: new RegExp(`(?<![\\p{L}\\p{N}])(${alt})\\.?\\s*(\\d{1,3})(?:\\s*[:.]\\s*(\\d{1,3})(?:\\s*[-–—]\\s*(\\d{1,3}))?)?(?![\\p{L}\\p{N}:])`, 'giu'),
+      // Half verses ("6:12b-19a") and ranges that cross a chapter ("15:1-15:29") are part of the
+      // link, so the whole reference is what you tap rather than the first half of it.
+      re: new RegExp(`(?<![\\p{L}\\p{N}])(${alt})\\.?\\s*(\\d{1,3})(?:\\s*[:.]\\s*(\\d{1,3})[a-c]?(?:\\s*[-–—]\\s*(?:\\d{1,3}\\s*[:.]\\s*)?(\\d{1,3})[a-c]?)?)?(?![\\p{L}\\p{N}:])`, 'giu'),
       code: Object.fromEntries(names.map(([a, c]) => [a.replace(/ \?/g, ' '), c])),
     };
   })();
@@ -56,6 +58,37 @@
   }
 
   // Wraps every reference in an element's text nodes with a link to the reader.
+  // The daily reading ends with "📖 Read", a link to the day's own page. It belongs at the end
+  // of the first line, against the right margin, rather than on a line of its own: the post is a
+  // date, its passages, and a way in.
+  function liftReadingLink(root) {
+    if (!root) return;
+    for (const el of root.querySelectorAll('.text:not(.b-read-lifted)')) {
+      const link = el.querySelector('a[href*="/reading/"]');
+      if (!link || link.closest('.b-read')) continue;
+      el.classList.add('b-read-lifted');
+      const go = document.createElement('span');
+      go.className = 'b-read';
+      // Take the 📖 that sits in front of the link, and the line break before that.
+      const before = link.previousSibling;
+      if (before && before.nodeType === Node.TEXT_NODE && before.nodeValue.trim() === '📖') {
+        go.appendChild(document.createTextNode('📖 '));
+        before.remove();
+      }
+      const br = el.querySelector('br:last-of-type');
+      if (br && !br.nextSibling?.textContent?.trim()) br.remove();
+      const lineBreak = go.previousSibling;
+      if (lineBreak && lineBreak.nodeName === 'BR') lineBreak.remove();
+      go.appendChild(link);
+      for (let n = el.lastChild; n && (n.nodeName === 'BR' || (n.nodeType === Node.TEXT_NODE && !n.nodeValue.trim()));) {
+        const prev = n.previousSibling;
+        n.remove();
+        n = prev;
+      }
+      el.insertBefore(go, el.firstChild);
+    }
+  }
+
   function linkBibleRefs(root) {
     if (!APP.bible || !root) return;
     for (const el of root.querySelectorAll('.text:not(.b-linked)')) {
@@ -78,7 +111,9 @@
           const a = document.createElement('a');
           a.className = 'bref';
           a.href = `${APP.base}read/${ref.code}/${ref.chapter}${ref.verse ? '#v' + ref.verse : ''}`;
-          a.textContent = m[0];
+          // "1 Chronicles 18:1-17" may wrap before the chapter, but never after the "1", which
+          // would leave the numeral stranded at the end of a line.
+          a.textContent = m[0].replace(/^([123]|i{1,3})\s+/i, '$1 ');
           frag.append(a);
           last = m.index + m[0].length;
         }

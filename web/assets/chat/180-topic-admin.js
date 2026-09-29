@@ -1,8 +1,10 @@
-  // Making and changing topics (admins, and creators of their own): name, colour, icon from the
+  // Making and changing topics (admins, and creators of their own): name, color, icon from the
   // symbol library, pin to the top, close, and delete.
 
   const canManage = (t) => APP.admin || (t.created_by && t.created_by === APP.me);
-  const TOPIC_COLORS = ['#4bb7ff', '#ffdb5c', '#e57aff', '#97e334', '#ff7999', '#ff714c'];
+  // The same six the topic tiles use (see .ticon.cN in chat.css), so the swatch you pick is the
+  // color you get. Blue first: that is what a new topic starts as.
+  const TOPIC_COLORS = ['#0087f5', '#00a0a0', '#5b3fe0', '#1da83b', '#e02a1d', '#f54200'];
   let iconNames = null;
 
   // The names of the symbols in topic-icons.svg, read from the file itself for the picker.
@@ -14,18 +16,18 @@
     return iconNames;
   }
 
-  // New topic, or the settings of one: name, colour, symbol, and (for existing ones) pin to the
+  // New topic, or the settings of one: name, color, symbol, and (for existing ones) pin to the
   // top, close and delete.
   async function topicDialog(t = null) {
     const names = await loadIconNames();
     const dlg = document.createElement('div');
     dlg.className = 'modal';
-    let icon = t ? (t.icon || '') : '', color = t ? t.color % 6 : Math.floor(Math.random() * 6);
+    let icon = t ? (t.icon || '') : '', color = t ? t.color % 6 : 0;
     dlg.innerHTML = `<form class="sheet-card topic-form">
         <h2>${t ? 'Edit topic' : 'New topic'}</h2>
         <label>Name<input name="title" maxlength="128" required value="${esc(t ? t.title : '')}"></label>
-        ${t && t.general ? '' : `<div class="field-label">Colour</div><div class="swatches">${TOPIC_COLORS.map((c, i) =>
-          `<button type="button" class="swatch" data-color="${i}" aria-label="Colour ${i + 1}"><span></span></button>`).join('')}</div>
+        ${t && t.general ? '' : `<div class="field-label">Color</div><div class="swatches">${TOPIC_COLORS.map((c, i) =>
+          `<button type="button" class="swatch" data-color="${i}" aria-label="Color ${i + 1}"><span></span></button>`).join('')}</div>
         <div class="field-label">Icon</div>
         <div class="icon-grid"><button type="button" class="icon-opt" data-icon="" title="First letter">Aa</button>${names.map((n) =>
           `<button type="button" class="icon-opt" data-icon="${n}" title="${n.replace(/-/g, ' ')}"><svg viewBox="0 0 512 512"><use href="${APP.icons}#ti-${n}"/></svg></button>`).join('')}</div>`}
@@ -33,7 +35,7 @@
       </form>`;
     document.body.appendChild(dlg);
     const form = $('form', dlg);
-    // Swatch colours are set from JS (inline style attributes are blocked by our CSP).
+    // Swatch colors are set from JS (inline style attributes are blocked by our CSP).
     dlg.querySelectorAll('.swatch span').forEach((sw, i) => { sw.style.background = TOPIC_COLORS[i]; });
     const mark = () => {
       dlg.querySelectorAll('.swatch').forEach((b) => b.classList.toggle('on', +b.dataset.color === color));
@@ -92,7 +94,11 @@
     const fab = document.createElement('button');
     fab.className = 'new-topic';
     fab.setAttribute('aria-label', 'New topic');
-    fab.innerHTML = '✎';
+    // A drawn pencil rather than the ✎ character, which comes out thin and small, and differently
+    // on every platform.
+    fab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+      + '<path d="M16.8 3.2a2.7 2.7 0 0 1 3.8 3.8L8 19.6 3 21l1.4-5L16.8 3.2z"/>'
+      + '<path d="M15.2 4.8l4 4"/></svg>';
     fab.addEventListener('click', () => topicDialog());
     $('.pane-list').appendChild(fab);
   }

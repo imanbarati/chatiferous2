@@ -3,6 +3,35 @@
 require __DIR__ . '/boot.php';
 
 $user = require_login();
+$reading_topic = 0;
+$reading_chapters = [];
+if (config('bible_reader') && config('daily_reading')) {
+    require_once APP_DIR . '/lib/reading.php';
+    require_once APP_DIR . '/lib/bible_refs.php';
+    $reading_topic = (int)setting('daily_reading_topic');
+    // Which chapters today's reading covers, so the app can keep their commentary on the device
+    // alongside the reading itself. A handful of chapters, and the list is cheap to work out.
+    foreach (readings_for(gmdate('Y-m-d')) as $line) {
+        foreach (bible_reading_refs($line) as $r) {
+            for ($c = $r['chapter']; $c <= $r['end_chapter'] && count($reading_chapters) < 12; $c++) {
+                $reading_chapters[] = $r['book'] . '/' . $c;
+            }
+        }
+    }
+    $reading_chapters = array_values(array_unique($reading_chapters));
+}
+// Whether the address asks for a topic rather than the list. The app works this out for itself a
+// moment later, but a moment is long enough to see: on a phone the list fills the screen until the
+// script says otherwise, so pressing Back showed the front page and then the page wanted.
+$path = trim((string)parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH), '/');
+$base = trim((string)config('base_url'), '/');
+if ($base !== '' && str_starts_with($path, $base)) {
+    $path = ltrim(substr($path, strlen($base)), '/');
+}
+// Only a topic. "messages" is the list of conversations, which belongs in the pane the list lives
+// in — opening the chat pane for it would hide the very thing it asks for.
+$open_topic = (bool)preg_match('#^t/\d+(/|$)#', $path);
+
 $members = (int)q("SELECT COUNT(*) FROM users WHERE role <> 'system' AND status IN ('active','unclaimed')")->fetchColumn();
 $group = config('group_name');
 ?><!doctype html>
@@ -23,7 +52,7 @@ $group = config('group_name');
 <link rel="stylesheet" href="<?= asset('app.css') ?>">
 <link rel="stylesheet" href="<?= asset('chat.css') ?>">
 </head>
-<body class="chat-app<?= config('wallpaper') ? ' wallpaper' : '' ?>" data-app="<?= h(json_encode([
+<body class="chat-app<?= config('wallpaper') ? ' wallpaper' : '' ?><?= $open_topic ? ' chat-open' : '' ?>" data-app="<?= h(json_encode([
     'base'  => url(),
     'csrf'  => csrf_token(),
     'me'    => (int)$user['id'],
@@ -35,6 +64,12 @@ $group = config('group_name');
     'telegram' => telegram_login_enabled(),
     'signinNote' => (string)config('signin_note'),
     'bible' => (bool)config('bible_reader'),
+    // Which topic the day's reading is posted into, and which day it is. Opening that topic is
+    // what puts the readings on the device: it is where people are when they think about the
+    // reading, and few of them will open the reading page first.
+    'readingTopic' => $reading_topic,
+    'readingDate' => $reading_topic ? gmdate('Y-m-d') : '',
+    'readingChapters' => $reading_chapters,
     'icons' => asset('topic-icons.svg'),
     'version' => app_version(),
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>">
@@ -48,7 +83,7 @@ $group = config('group_name');
 <div class="app">
   <section class="pane-list" aria-label="Topics">
     <header class="bar">
-      <div class="group-avatar sm" aria-hidden="true"><?= h(config('group_emoji')) ?></div>
+      <?= group_avatar('sm') ?>
       <div class="bar-title">
         <div class="bar-name"><?= h($group) ?></div>
         <div class="bar-sub"><?= $members ?> members</div>
@@ -68,7 +103,8 @@ $group = config('group_name');
           <a href="<?= url('account.php') ?>">My account</a>
           <a href="<?= url('notifications.php') ?>">Notifications</a>
           <a href="<?= url('invite.php') ?>">Invite someone</a>
-          <?php if (config('bible_reader') && config('daily_reading')): ?><a href="<?= url('reading') ?>">Today’s reading</a><?php endif ?>
+          <?php if (config('bible_reader')): ?><a href="<?= url('bible.php') ?>">Read the Bible</a><?php endif ?>
+      <?php if (config('bible_reader') && config('daily_reading')): ?><a href="<?= url('reading') ?>">Today’s reading</a><?php endif ?>
           <a href="<?= url('install.php') ?>">Install on your phone</a>
           <button type="button" data-theme-toggle>Appearance: <span data-theme-label>Auto</span></button>
           <button type="button" data-sound-toggle>Sounds: <span data-sound-label>On</span></button>
@@ -84,7 +120,7 @@ $group = config('group_name');
     <div id="topics" class="topics"><p class="loading">Loading…</p></div>
   </section>
   <section class="pane-chat" id="chat" aria-live="polite">
-    <div class="chat-empty"><span>Select a topic</span></div>
+    <?php if (!$open_topic): ?><div class="chat-empty"><span>Select a topic</span></div><?php endif ?>
   </section>
 </div>
 <div id="viewer" class="viewer" hidden><button class="viewer-close" aria-label="Close">✕</button><img alt=""></div>

@@ -17,6 +17,11 @@ function preview_normalize(string $url): ?string
     if (strlen($url) > 2048 || !preg_match('~^https?://[^\s/?#]+~i', $url)) {
         return null;
     }
+    // A link into this app needs no card: everything here is behind the sign-in page, so the
+    // card would describe that page instead of what was linked to.
+    if (stripos($url, rtrim(url(), '/')) === 0) {
+        return null;
+    }
     return $url;
 }
 

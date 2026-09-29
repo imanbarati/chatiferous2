@@ -75,9 +75,22 @@ function bible_find_refs(string $text, int $limit = 40): array
     $names = array_keys(bible_ref_names());
     $codes = bible_ref_names();
     $alt = implode('|', array_map(fn($n) => preg_quote($n, '/'), $names));
-    // book, chapter, then optionally :verse, a range, and a list of further verses
+    // book, chapter, then optionally :verse, a range, and a list of further verses.
+    // A verse may be written as half of one — "6:12b-19a" — which the schedule does where a
+    // passage begins or ends mid-verse. The letter is taken and ignored, so the whole verse is
+    // quoted: better a little more than the wrong thing, and without it "6:1-6:12a" was read as
+    // 6:1-6 and "6:12b-19a" as the whole chapter.
+    // Two further shapes the schedule uses. A range may name its book again at the far end
+    // ("Genesis 27:41-Genesis 28:22"), which otherwise reads as two lone verses with everything
+    // between them missing. And a run of whole chapters may be written without any verse at all
+    // ("2 Chronicles 1-15"), which otherwise stops at the first chapter.
     $re = '/(?<![\p{L}\p{N}])(' . $alt . ')\.?\s*(\d{1,3})'
-        . '(?:\s*[:.]\s*(\d{1,3})(?:\s*[-–—]\s*(?:(\d{1,3})\s*[:.]\s*)?(\d{1,3}))?)?'
+        . '(?:'
+            . '\s*[:.]\s*(\d{1,3})[a-c]?'
+            . '(?:\s*[-–—]\s*(?:(?:' . $alt . ')\.?\s*)?(?:(\d{1,3})\s*[:.]\s*)?(\d{1,3})[a-c]?)?'
+        . '|'
+            . '\s*[-–—]\s*(\d{1,3})(?![:.\d])'
+        . ')?'
         . '(?![\p{L}\p{N}])/iu';
     if (!preg_match_all($re, $text, $ms, PREG_OFFSET_CAPTURE | PREG_SET_ORDER)) {
         return [];
@@ -96,10 +109,17 @@ function bible_find_refs(string $text, int $limit = 40): array
         $verse = isset($m[3]) && $m[3][0] !== '' ? (int)$m[3][0] : 0;
         $end_chapter = isset($m[4]) && $m[4][0] !== '' ? (int)$m[4][0] : $chapter;
         $end_verse = isset($m[5]) && $m[5][0] !== '' ? (int)$m[5][0] : $verse;
-        // A one-chapter book written as "Jude 5" means verse 5, not chapter 5.
+        // "2 Chronicles 1-15": whole chapters, no verses named at either end.
+        if (isset($m[6]) && $m[6][0] !== '') {
+            $end_chapter = (int)$m[6][0];
+            $verse = 0;
+            $end_verse = 0;
+        }
+        // A one-chapter book written as "Jude 5" means verse 5, not chapter 5 — and "Jude 5-7"
+        // means those verses, not those chapters.
         if ($chapters === 1 && $verse === 0) {
             $verse = $chapter;
-            $end_verse = $verse;
+            $end_verse = $end_chapter > $chapter ? $end_chapter : $verse;
             $chapter = 1;
             $end_chapter = 1;
         }
@@ -116,10 +136,24 @@ function bible_find_refs(string $text, int $limit = 40): array
             'verse'  => $verse,
             'end_chapter' => max($chapter, $end_chapter),
             'end_verse'   => $end_verse,
-            'ref'    => $name . ' ' . $chapter . ($verse ? ':' . $verse . ($end_verse > $verse ? '-' . $end_verse : '') : ''),
+            // What the passage is called above its text. A range that crosses a chapter has to say
+            // so — "Galatians 3:15-4:20", not "3:15-20", which names a fifth of what is shown.
+            'ref'    => bible_ref_label($name, $chapter, $verse, max($chapter, $end_chapter), $end_verse),
         ];
     }
     return $out;
+}
+
+// "Psalm 23", "John 3:16", "1 John 2:1-3", "Galatians 3:15-4:20", "2 Chronicles 1-15".
+function bible_ref_label(string $name, int $chapter, int $verse, int $end_chapter, int $end_verse): string
+{
+    if (!$verse) {
+        return $name . ' ' . $chapter . ($end_chapter > $chapter ? '-' . $end_chapter : '');
+    }
+    if ($end_chapter > $chapter) {
+        return $name . ' ' . $chapter . ':' . $verse . '-' . $end_chapter . ':' . ($end_verse ?: 1);
+    }
+    return $name . ' ' . $chapter . ':' . $verse . ($end_verse > $verse ? '-' . $end_verse : '');
 }
 
 // The passages a day's reading covers, from the schedule's own wording ("1 Chronicles 17; Ps 23").

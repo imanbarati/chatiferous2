@@ -3,7 +3,7 @@
 // afterwards. Run with tests/run_browser_tests.sh (it creates and removes the session).
 const puppeteer = require('puppeteer-core');
 
-const [,, sid, topic, shots] = process.argv;
+const [,, sid, topic, shots, readerSid] = process.argv;
 const BASE = process.env.SITE_URL;   // from site.env, via the run_*.sh script
 const SITE = new URL(BASE);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -19,6 +19,9 @@ const check = (name, ok, detail = '') => { if (ok) passed++; else failed.push(na
   const errors = [];
   const open = async (width, height, mobile = false) => {
     const p = await browser.newPage();
+    // The site is on shared hosting whose load comes and goes; 30 seconds is not always enough to
+    // open a page there, and a run that gives up half way leaves its posts behind.
+    p.setDefaultNavigationTimeout(90000);
     p.on('pageerror', (e) => errors.push(e.message));
     p.on('dialog', (d) => d.accept());
     await p.setViewport({ width, height, isMobile: mobile, hasTouch: mobile });
@@ -34,7 +37,15 @@ const check = (name, ok, detail = '') => { if (ok) passed++; else failed.push(na
   const newIds = async () => (await ids(a)).filter((i) => !before.has(i));
   const last = async () => (await newIds()).pop();
   // Waits (up to 6 s) for a condition in the page instead of a fixed pause: the shared server's speed varies.
-  const until = (p, fn, arg) => p.waitForFunction(fn, { timeout: 6000 }, arg).then(() => true, () => false);
+  const until = (p, fn, arg, ms = 6000) => p.waitForFunction(fn, { timeout: ms }, arg).then(() => true, () => false);
+  // For conditions that have to ask the server: waitForFunction re-runs on every animation frame,
+  // which would be sixty requests a second. This asks twice a second instead.
+  const untilServer = async (p, fn, arg, ms = 12000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await wait(500)) {
+      if (await p.evaluate(fn, arg).catch(() => false)) return true;
+    }
+    return false;
+  };
 
   try {
     // Formatting
@@ -103,15 +114,33 @@ const check = (name, ok, detail = '') => { if (ok) passed++; else failed.push(na
       && refs[1][1].includes('read/1JN/2'), JSON.stringify(refs));
     check('a bare chapter:verse is left alone', !refs.some((r) => r[0].trim() === '3:16'));
 
+    // A link into the app itself (as the daily reading uses) opens in the app, not a new tab.
+    await a.type('.composer textarea', '[Automated test, please ignore] [the day](' + new URL(BASE).pathname + 'reading/2026-09-19) and [elsewhere](https://example.com/)');
+    await a.keyboard.press('Enter');
+    await wait(1500);
+    const hrefs = await a.evaluate(() => [...document.querySelectorAll('.msg:last-child .text a')]
+      .map((x) => [x.getAttribute('href'), x.getAttribute('target') || 'same tab']));
+    check('a link into the app opens in the app', hrefs.some((h) => h[0].endsWith('reading/2026-09-19') && h[1] === 'same tab'),
+      JSON.stringify(hrefs));
+    check('a link elsewhere still opens in a new tab', hrefs.some((h) => h[0].startsWith('https://example.com') && h[1] === '_blank'),
+      JSON.stringify(hrefs));
+
     // The Bible reader with no signal: a book downloaded to the device still reads.
     {
       const r = await browser.newPage();
+      r.setDefaultNavigationTimeout(90000);
       r.on('pageerror', (e) => errors.push(e.message));
-      await r.setCookie({ name: process.env.COOKIE, value: sid, domain: SITE.hostname, path: SITE.pathname, secure: true, httpOnly: true });
+      // A throwaway member: what is read here is remembered, and none of it should be anyone's.
+      await r.setCookie({ name: process.env.COOKIE, value: readerSid || sid, domain: SITE.hostname, path: SITE.pathname, secure: true, httpOnly: true });
       await r.goto(BASE + 'read/JHN/3', { waitUntil: 'networkidle0' });
       await r.evaluate(() => navigator.serviceWorker.ready);
       await r.reload({ waitUntil: 'networkidle0' });      // now the worker sees the page's own assets
-      const version = await r.evaluate(() => JSON.parse(document.body.dataset.bible).version);
+      // Whichever version the account happens to be on, offline reading is tested with one that
+      // can be kept here — the fetched translations are a chapter at a time by licence.
+      const version = await r.evaluate(() => {
+        const a = JSON.parse(document.body.dataset.bible);
+        return a.versions.find((v) => !(a.fetched || []).includes(v)) || a.version;
+      });
       const base = await r.evaluate(() => JSON.parse(document.body.dataset.bible).base);
 
       // Download one book the way the menu's switch does, and mark the version as kept here.
@@ -139,11 +168,44 @@ const check = (name, ok, detail = '') => { if (ok) passed++; else failed.push(na
       await r.goto(BASE + 'read/ROM/11', { waitUntil: 'domcontentloaded' });
       await until(r, () => !!document.querySelector('.vn[data-v="33"]'));
       await r.evaluate(() => document.querySelector('.vn[data-v="33"]').click());
-      const commentary = await until(r, () => !!document.querySelector('.b-comm-entry'));
-      const names = await r.evaluate(() => [...document.querySelectorAll('.b-comm-who')]
-        .map((h) => h.textContent));
-      check('a verse number opens the commentaries', commentary && names.includes('Matthew Henry (Full)'),
-        names.join(', '));
+      const commentary = await until(r, () => !!document.querySelector('.b-comm-page'));
+      const firstWork = await r.evaluate(() => document.querySelector('.b-comm-who')?.textContent || '');
+      check('a verse number opens the commentaries', commentary && firstWork !== '', firstWork);
+      // the next commentary is a swipe to the left (or the chevron, on a desktop)
+      const pages = await r.evaluate(() => document.querySelectorAll('.b-comm-page').length);
+      await r.evaluate(() => document.querySelector('.b-comm-on').click());
+      const moved = await until(r, (was) => document.querySelector('.b-comm-who')?.textContent !== was, firstWork);
+      check('the next commentary is one step away', pages > 1 && moved, `${pages} works`);
+      // How the commentary is set: its own size and face, apart from the Bible text's.
+      // (This runs as the owner, so whatever was set is put back at the end.)
+      const settingsBefore = await r.evaluate(() => localStorage.getItem('bible-settings'));
+      await r.evaluate(() => document.querySelector('[data-comm="look"]').click());
+      const panel = await until(r, () => !!document.querySelector('.b-look'));
+      const sizeBefore = await r.evaluate(() => getComputedStyle(document.querySelector('.b-comm-page')).fontSize);
+      const bibleBefore = await r.evaluate(() => getComputedStyle(document.querySelector('.b-chapter')).fontSize);
+      // Bigger, or smaller if it is already as big as it goes.
+      await r.evaluate(() => document.querySelector('[data-csize="1"]').click());
+      await wait(400);
+      let after = await r.evaluate(() => [getComputedStyle(document.querySelector('.b-comm-page')).fontSize,
+        getComputedStyle(document.querySelector('.b-chapter')).fontSize]);
+      if (after[0] === sizeBefore) {
+        await r.evaluate(() => document.querySelector('[data-csize="-1"]').click());
+        await wait(400);
+        after = await r.evaluate(() => [getComputedStyle(document.querySelector('.b-comm-page')).fontSize,
+          getComputedStyle(document.querySelector('.b-chapter')).fontSize]);
+      }
+      check('the commentary has its own size', panel && after[0] !== sizeBefore, `${sizeBefore} -> ${after[0]}`);
+      check('and the Bible text keeps its own', after[1] === bibleBefore, `${bibleBefore} -> ${after[1]}`);
+      await r.evaluate(() => document.querySelector('[data-look="done"]').click());
+      check('the panel closes on Done', await until(r, () => !document.querySelector('.b-look')));
+      // put the settings back where they were
+      await r.evaluate(async (was, base, csrf) => {
+        localStorage.setItem('bible-settings', was);
+        await fetch(base + 'api/bible.php', { method: 'POST', credentials: 'same-origin',
+          headers: { 'X-CSRF': csrf }, body: new URLSearchParams({ action: 'prefs', settings: was }) });
+      }, settingsBefore, BASE, await r.evaluate(() => JSON.parse(document.body.dataset.bible).csrf));
+      await wait(500);
+
       // and the list of which to show opens from there (without changing what's chosen)
       await r.evaluate(() => document.querySelector('[data-comm="choose"]').click());
       const chooser = await until(r, () => document.querySelectorAll('.b-work').length > 20);
@@ -151,7 +213,7 @@ const check = (name, ok, detail = '') => { if (ok) passed++; else failed.push(na
       await r.keyboard.press('Escape');
       await r.evaluate(() => document.querySelector('.b-sheet')?.remove());
 
-      // Marking a verse: hold it (a right-click, on a desktop) and pick a colour.
+      // Marking a verse: hold it (a right-click, on a desktop) and pick a color.
       await r.goto(BASE + 'read/3JN/1', { waitUntil: 'domcontentloaded' });
       await until(r, () => !!document.querySelector('.v[data-v="2"]'));
       await r.evaluate(() => document.querySelector('.v[data-v="2"]')
@@ -161,8 +223,14 @@ const check = (name, ok, detail = '') => { if (ok) passed++; else failed.push(na
       check('a verse can be highlighted', sheet
         && await until(r, () => document.querySelector('.v[data-v="2"]')?.classList.contains('b-hl-green')));
 
-      // and it's the account's, not the page's: it's still there after a reload
-      await wait(1800);
+      // and it's the account's, not the page's: it's still there after a reload. The mark is sent
+      // in the background, so wait for the account to have it rather than for a guessed moment —
+      // the reader would show it from this device's own copy either way.
+      await untilServer(r, async (base) => {
+        const d = await fetch(base + 'api/marks.php', { credentials: 'same-origin' })
+          .then((x) => x.json()).catch(() => null);          // a busy host answers with a page, not JSON
+        return !!d && (d.marks || []).some((m) => m.book === '3JN' && +m.verse === 2);
+      }, BASE);
       await r.goto(BASE + 'read/3JN/1', { waitUntil: 'domcontentloaded' });
       check('a highlight is kept in the account',
         await until(r, () => document.querySelector('.v[data-v="2"]')?.classList.contains('b-hl-green')));
@@ -182,12 +250,36 @@ const check = (name, ok, detail = '') => { if (ok) passed++; else failed.push(na
       await r.evaluate(() => document.querySelector('.v[data-v="2"]')
         .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })));
       await until(r, () => !!document.querySelector('.b-actions .b-sw-off'));
+      // The account is told after the page is, and on a busy shared host that can take a while.
+      // Ask twice rather than assume the first tap landed: leaving a mark behind would make the
+      // next run start dirty.
+      const gone = async () => untilServer(r, async (base) => {
+        const d = await fetch(base + 'api/marks.php', { credentials: 'same-origin' })
+          .then((x) => x.json()).catch(() => null);
+        return !!d && !(d.marks || []).some((m) => m.book === '3JN' && +m.verse === 2);
+      }, BASE);
       await r.click('.b-actions .b-sw-off');
-      await wait(1800);      // the account is told after the page is marked; let that land
+      if (!await gone()) {
+        await r.goto(BASE + 'read/3JN/1', { waitUntil: 'domcontentloaded' });
+        await until(r, () => !!document.querySelector('.v[data-v="2"]'));
+        await r.evaluate(() => document.querySelector('.v[data-v="2"]')
+          .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })));
+        if (await until(r, () => !!document.querySelector('.b-actions .b-sw-off'))) {
+          await r.click('.b-actions .b-sw-off');
+          await gone();
+        }
+      }
       await r.goto(BASE + 'read/3JN/1', { waitUntil: 'domcontentloaded' });
       check('a highlight comes off again',
-        await until(r, () => document.querySelector('.v[data-v="2"]') && !document.querySelector('.b-hl')));
+        await until(r, () => document.querySelector('.v[data-v="2"]') && !document.querySelector('.b-hl'), null, 15000));
 
+      // Reading with no signal needs the worker in charge and the shell already put by. Both
+      // settle a moment after the page does, so pulling the plug before they have is a race the
+      // test used to lose about half the time.
+      const ready = await until(r, async () => !!navigator.serviceWorker.controller
+        && (await caches.open('chatiferous-shell').then((c) => c.keys()))
+          .some((k) => k.url.endsWith('/reader-shell')), null, 15000);
+      check('the reader is ready to work offline', ready);
       await r.setOfflineMode(true);
       await r.goto(BASE + 'read/JUD/1?v=' + version, { waitUntil: 'domcontentloaded' }).catch(() => {});
       const shown = await until(r, () => document.querySelector('.b-chapter')?.dataset.book === 'JUD'
@@ -345,8 +437,20 @@ const check = (name, ok, detail = '') => { if (ok) passed++; else failed.push(na
   } catch (e) {
     failed.push('crashed: ' + e.message + (e.stack ? '\n    ' + e.stack.split('\n').slice(1, 3).join('\n    ') : ''));
   } finally {
-    // Clean up everything this test posted.
-    const mine = await newIds();
+    // Clean up after this test — and only after this test. Anything that appeared while the run
+    // was going is not necessarily ours: a member posting in the same topic at the same moment
+    // would once have been deleted along with it. Only what carries the test's own marking goes.
+    const mine = await a.evaluate((seen) => {
+      const out = [];
+      for (const el of document.querySelectorAll('.messages [data-id]')) {
+        const id = +el.dataset.id;
+        if (seen.includes(id)) continue;
+        const text = (el.querySelector('.text')?.textContent || '').trim();
+        const poll = (el.querySelector('.poll-q')?.textContent || '').trim();   // a poll's words live here
+        if (text.startsWith('[Automated test') || poll.startsWith('[Automated test')) out.push(id);
+      }
+      return out;
+    }, [...before]);
     for (const id of mine) {
       await a.evaluate(async (id) => {
         const app = JSON.parse(document.body.dataset.app);

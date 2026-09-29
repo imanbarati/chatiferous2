@@ -1,4 +1,4 @@
--- The commentaries: a catalogue of works, and one row per work per chapter holding that
+-- The commentaries: a catalog of works, and one row per work per chapter holding that
 -- chapter's comments (as compressed JSON keyed by verse range). A chapter of one commentary is
 -- 20-80 KB of text, so it is kept packed and unpacked when someone actually opens it; a whole
 -- Bible of thirty works is then a few hundred megabytes rather than a couple of gigabytes.
@@ -12,7 +12,7 @@ CREATE TABLE bible_works (
   years      VARCHAR(32) NOT NULL DEFAULT '',
   scope      ENUM('all','ot','nt','some') NOT NULL DEFAULT 'all',
   source     VARCHAR(160) NOT NULL DEFAULT '',
-  licence    VARCHAR(80)  NOT NULL DEFAULT 'Public domain',
+  license    VARCHAR(80)  NOT NULL DEFAULT 'Public domain',
   sort       SMALLINT NOT NULL DEFAULT 100,
   chapters   MEDIUMINT UNSIGNED NOT NULL DEFAULT 0,
   PRIMARY KEY (code)

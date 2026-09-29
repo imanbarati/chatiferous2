@@ -44,6 +44,7 @@
   --glass-edge: rgba(255,255,255,.7);
   --glass-shine: rgba(255,255,255,.8);
   --n0: #d45246; --n1: #c75f14; --n2: #6c61df; --n3: #2f8a2c; --n4: #177f73; --n5: #3a7fc0; --n6: #d0476a;
+  --back-ink: var(--accent);
   --radius: 12px;
   --tap: 48px;
   font-size: 17px;
@@ -59,15 +60,17 @@
   --accent-soft: rgba(135,116,225,.18);
   --accent-ring: rgba(135,116,225,.6);
   --link: #a99bff;
+  /* A lone Back glyph needs more than the accent, which is a dim purple here. */
+  --back-ink: #b3a9ff;
   --bg: #0f0f0f;
   --panel: #212121;
   --hover: #2c2c2c;
   --text: #ffffff;
   --muted: #aaaaaa;
   --border: #3b3b3d;
-  --popover: #2e2e32;
-  --popover-edge: #4a4a50;
-  --popover-hover: #3a3a3f;
+  --popover: #3c3c44;          /* a menu is a surface above the page, and should look it */
+  --popover-edge: #5f5f6b;
+  --popover-hover: #4a4a54;
   --divider: #2f2f31;
   --danger: #ff6b6b;
   --ok-bg: #1f3324;
@@ -110,6 +113,11 @@ body {
 a { color: var(--link); }
 h1 { font-size: 1.3rem; margin: 0 0 .25rem; line-height: 1.25; }
 button { font: inherit; cursor: pointer; }
+/* Said to a screen reader, shown to nobody. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
 summary, [role="button"], [role="link"], label:has(> input[type="checkbox"], > input[type="radio"]) { cursor: pointer; }
 button:disabled { cursor: default; }
 .muted { color: var(--muted); }
@@ -120,14 +128,28 @@ button:disabled { cursor: default; }
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; gap: .5rem;
   min-height: 56px;
-  padding: calc(.25rem + env(safe-area-inset-top)) max(.75rem, env(safe-area-inset-right)) .25rem max(.75rem, env(safe-area-inset-left));
+  padding: calc(.5rem + env(safe-area-inset-top)) max(.75rem, env(safe-area-inset-right)) .5rem max(.75rem, env(safe-area-inset-left));
   background: var(--panel);
-  border-bottom: 1px solid var(--divider);
+  /* The line under the bar carries the join between two surfaces of nearly the same color in the
+     dark theme, so it is drawn in its own light rather than in the divider's. */
+  border-bottom: 1px solid var(--bar-rule, var(--divider));
+}
+/* The bar is a header, not the first row of the list, so it stands on its own surface with a
+   line and a little shadow under it. Without that it shares the list's exact background and
+   reads as another item. */
+.bar { box-shadow: 0 2px 6px var(--bar-shade); }
+:root { --bar-rule: rgba(0,0,0,.14); --bar-shade: rgba(0,0,0,.05); --list-bg: #f6f6f8; }
+:root[data-theme="dark"] { --bar-rule: rgba(255,255,255,.16); --bar-shade: rgba(0,0,0,.35); --list-bg: #191919; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bar-rule: rgba(255,255,255,.16); --bar-shade: rgba(0,0,0,.35); --list-bg: #191919; }
 }
 .bar-back {
   display: grid; place-items: center;
   width: var(--tap); height: var(--tap); margin-left: -.5rem;
-  font-size: 2rem; line-height: 1; text-decoration: none; color: var(--accent);
+  /* The same arrow, at the same size, as the one back out of the reader. Its ink sits low in the
+     em box, so it is nudged up to sit level with the title beside it. */
+  font-size: 2.4rem; line-height: 1; text-decoration: none; color: var(--back-ink);
+  transform: translateY(-4px);
 }
 .bar-title { flex: 1; min-width: 0; }
 .bar-name { font-weight: 600; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -140,6 +162,35 @@ button:disabled { cursor: default; }
   font-size: 1.5rem; color: var(--muted); border-radius: 50%;
 }
 .menu summary::-webkit-details-marker { display: none; }
+
+/* On a phone the three buttons at the end of the bar crowd the group's name off the screen.
+   They keep a 44px tap target through their own height; it's the space between and around them
+   that goes. */
+@media (max-width: 520px) {
+  .bar { padding-right: max(.35rem, env(safe-area-inset-right)); }
+  .bar .bar-icon, .bar .search-open, .bar .menu summary { width: 2.15rem; }
+  .bar .bar-icon svg { width: 25px; height: 25px; }
+  /* Only the buttons at the end close up; the name keeps its distance from the group's picture.
+     The three are spaced by what you see rather than by their boxes: the ⋮ is a sliver of ink in
+     a full-sized tap target, so an even gap between the boxes looks lopsided. Measured at 390px,
+     these bring the gaps between the glyphs themselves to about 21px apiece. */
+  .bar .bar-icon { margin-right: .25rem; }          /* the book sits left, not the search right */
+  .bar .bar-icon + .search-open { margin-left: -.4rem; }
+  .bar .search-open + .menu, .bar .bar-icon + .menu { margin-left: -.6rem; }
+  .bar .group-avatar.sm { width: 38px; height: 38px; font-size: 21px; }
+  .bar .bar-name { font-size: 1rem; }
+}
+
+/* On the narrowest phones (an SE, say) everything gives a little more, so that the group's name
+   is never cut short. */
+@media (max-width: 359px) {
+  .bar { padding-left: max(.45rem, env(safe-area-inset-left)); padding-right: max(.45rem, env(safe-area-inset-right)); }
+  .bar .group-avatar.sm { width: 32px; height: 32px; font-size: 18px; }
+  .bar .bar-icon, .bar .search-open, .bar .menu summary { width: 1.9rem; }
+  .bar .bar-icon svg { width: 23px; height: 23px; }
+  .bar .bar-name { font-size: .92rem; }
+  .bar .bar-sub { font-size: .75rem; }
+}
 .menu[open] summary { background: var(--hover); }
 .menu nav {
   position: absolute; right: 0; top: calc(var(--tap) + 4px); min-width: min(12rem, calc(100vw - 16px)); max-width: calc(100vw - 16px); max-height: calc(100vh - var(--tap) - 24px); max-height: calc(100dvh - var(--tap) - 24px); overflow-y: auto;
@@ -172,6 +223,7 @@ button:disabled { cursor: default; }
   border-radius: 33%; display: grid; place-items: center; font-size: 44px;
   background: linear-gradient(#72d5fd, #2a9ef1);
 }
+img.group-avatar { background: none; object-fit: cover; display: block; }
 .tg-login { min-height: 48px; margin: 1.25rem 0 .5rem; display: flex; justify-content: center; }
 .or { display: flex; align-items: center; gap: .75rem; margin: 1.25rem 0; color: var(--muted); }
 .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--divider); }
@@ -189,6 +241,14 @@ input {
   border: 1px solid var(--border); border-radius: 10px; background: var(--panel);
 }
 input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+/* The browser's own file button is a grey slab that ignores the theme; dress it as one of ours. */
+input[type="file"] { padding: .45rem .5rem; cursor: pointer; }
+input[type="file"]::file-selector-button {
+  font: inherit; font-size: .9rem; font-weight: 600; margin-right: .7rem; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; padding: .35rem .8rem;
+  background: var(--bg); color: var(--text);
+}
+input[type="file"]::file-selector-button:hover { background: var(--divider); }
 button.primary {
   min-height: var(--tap); border: 0; border-radius: 10px;
   background: var(--accent); color: #fff; font-weight: 600; font-size: 1rem;
@@ -239,6 +299,8 @@ img.avatar { object-fit: cover; background: var(--hover); }
 
 .credits { text-align: center; margin: 1.5rem .5rem; }
 .photo-form { margin: 0 0 1rem; display: grid; gap: .5rem; }
+/* A grid stretches its child, which would centre this lone button's label. */
+.photo-form > button.link { justify-self: start; padding-inline: 0; }
 .row-buttons { display: flex; justify-content: flex-end; gap: .5rem; }
 .row-buttons.left { justify-content: flex-start; align-items: center; }
 button.primary.pad { padding: 0 1.2rem; }

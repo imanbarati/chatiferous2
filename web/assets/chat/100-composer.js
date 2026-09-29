@@ -14,21 +14,32 @@
     state.mentionPicks = [];
     state.topicPicks = [];
     try {
-      ta.value = localStorage.getItem('draft:' + v.topic.id) || '';
+      // This runs when the topic's messages arrive, which on a slow day is a second or two after
+      // the box appears — long enough to have started typing into it. The box is built fresh for
+      // every topic, so anything already in it was typed just now, for this topic: keep it, and
+      // remember it, rather than replacing it with the saved draft.
+      if (ta.value.trim()) saveDraft();
+      else ta.value = localStorage.getItem('draft:' + v.topic.id) || '';
     } catch (e) { /* storage unavailable */ }
     autosize();
     updateSendButton();
-    ta.addEventListener('input', () => {
-      autosize(); updateSendButton(); mentionSearch();
-      clearTimeout(state.draftTimer);
-      state.draftTimer = setTimeout(saveDraft, 400);
-    });
-    ta.addEventListener('keydown', composerKey);
-    ta.addEventListener('paste', (e) => {
-      const files = [...(e.clipboardData?.files || [])];
-      if (files.length) { e.preventDefault(); files.forEach(addUpload); }
-    });
+    // The box survives when the shell is kept, and so do its listeners: binding them again would
+    // mean two of everything, and Enter sending the message twice.
+    if (!ta.dataset.bound) {
+      ta.dataset.bound = '1';
+      ta.addEventListener('input', () => {
+        autosize(); updateSendButton(); mentionSearch();
+        clearTimeout(state.draftTimer);
+        state.draftTimer = setTimeout(saveDraft, 400);
+      });
+      ta.addEventListener('keydown', composerKey);
+      ta.addEventListener('paste', (e) => {
+        const files = [...(e.clipboardData?.files || [])];
+        if (files.length) { e.preventDefault(); files.forEach(addUpload); }
+      });
+    }
     if (!TOUCH) ta.focus();
+    offlineUi();        // a box built while there is no signal must not look ready to send
   }
 
   // Keeps what you've typed, per topic, so leaving and coming back loses nothing. Not while
@@ -51,11 +62,24 @@
   }
 
   // Grows the box with what you write, up to a few lines, then lets it scroll.
+  // The box grows with what you type, up to a share of the screen you can actually see — with the
+  // keyboard up that is much less than the window.
   function autosize() {
     const ta = box();
     if (!ta) return;
+    const seen = window.visualViewport?.height || window.innerHeight;
+    const cap = Math.max(96, seen * 0.4);
+    ta.style.maxHeight = cap + 'px';
+    // Measuring means letting the box grow to the height of the whole message for an instant, and
+    // that throws away the scroll position the browser keeps the caret in. Once the box is full it
+    // stays full, so there is nothing to measure: leave it alone and you keep sight of the line
+    // you are typing on.
+    if (ta.scrollHeight > cap && ta.clientHeight >= cap - 1) { ta.style.height = cap + 'px'; return; }
+    const top = ta.scrollTop;
+    const atEnd = ta.selectionStart === ta.selectionEnd && ta.selectionStart === ta.value.length;
     ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.4) + 'px';
+    ta.style.height = Math.min(ta.scrollHeight, cap) + 'px';
+    ta.scrollTop = atEnd ? ta.scrollHeight : top;
   }
 
   // Send is shown when there's something to send; otherwise the attach and GIF buttons are.
@@ -222,10 +246,10 @@
       // "> " makes a quotation; the reference follows underneath.
       ta.value = (ta.value ? ta.value.replace(/\s*$/, '\n\n') : '')
         + q.text.split('\n').map((l) => '> ' + l).join('\n') + `\n— ${q.ref} (${q.version})\n`;
-      autosize();
       updateSendButton();
       ta.focus();
       ta.setSelectionRange(ta.value.length, ta.value.length);
+      autosize();
     });
   }
 
@@ -277,6 +301,13 @@
     const text = withTopicLinks(ta.value);
     const done = state.uploads.filter((u) => u.status === 'done');
     if (!text.trim() && !done.length && state.compose?.mode !== 'forward') return;
+    // With no signal, say so and leave the words where their author can see them. Nothing is
+    // queued: a message sent an hour late lands in a conversation that has moved on.
+    if (offlineNow()) {
+      toast('No connection — your message is saved here until there is one.');
+      saveDraft();
+      return;
+    }
     const btn = $('.composer .send', chatEl);
     btn.disabled = true;
     const mentions = JSON.stringify(state.mentionPicks.filter((p) => text.includes('@' + p.name)));

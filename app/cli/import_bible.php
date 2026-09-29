@@ -12,6 +12,11 @@ $sources = [
     'WEB' => ['url' => 'https://ebible.org/Scriptures/engwebp_usfm.zip', 'name' => 'World English Bible'],
     'BSB' => ['url' => 'https://ebible.org/Scriptures/engbsb_usfm.zip',  'name' => 'Berean Standard Bible'],
     'KJV' => ['url' => 'https://ebible.org/Scriptures/eng-kjv_usfm.zip', 'name' => 'King James Version'],
+    // Word for word to a fault, which is the point of having it. Public domain, 1898.
+    'YLT' => ['url' => 'https://ebible.org/Scriptures/engylt_usfm.zip',   'name' => 'Young’s Literal Translation'],
+    // The same idea done again in this century. Not public domain but freely licensed, which is
+    // why it carries a line of attribution under every chapter (see bible_notice()).
+    'LSV' => ['url' => 'https://ebible.org/Scriptures/englsv_usfm.zip',   'name' => 'Literal Standard Version'],
 ];
 
 $version = strtoupper($argv[1] ?? '');

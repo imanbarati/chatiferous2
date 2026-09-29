@@ -44,7 +44,21 @@ if (($_GET['action'] ?? '') === 'book') {
 
 // Search: references, phrases and words.
 if (($_GET['action'] ?? '') === 'search') {
-    json_out(bible_search($version, (string)($_GET['q'] ?? ''), (string)($_GET['scope'] ?? 'all')));
+    // v may name several translations, and scope may be a list of books chosen by hand.
+    $vs = array_values(array_filter(array_map('trim', explode(',', (string)($_GET['vs'] ?? $version)))));
+    $scope = (string)($_GET['scope'] ?? 'all');
+    if (str_contains($scope, ',') || (strlen($scope) === 3 && $scope !== 'all')) {
+        $books = array_values(array_filter(array_map(fn($c) => strtoupper(trim($c)), explode(',', $scope))));
+        $scope = count($books) === 1 && in_array($books[0], ['ALL'], true) ? 'all' : $books;
+    }
+    json_out(bible_search($vs ?: [$version], (string)($_GET['q'] ?? ''), $scope));
+}
+
+// The words of some cross-referenced verses, as the translation being read words them. Only for
+// the fetched translations: for the ones we hold, the list already quotes the right text.
+if (($_GET['action'] ?? '') === 'xreftext') {
+    $refs = array_slice(array_filter(explode(',', (string)($_GET['refs'] ?? ''))), 0, 24);
+    json_out(['texts' => api_bible_is($version) ? api_bible_verses($version, $refs) : []]);
 }
 
 // The cross-references for one verse, for the ✦ dialog.

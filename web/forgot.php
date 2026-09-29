@@ -7,7 +7,7 @@ require __DIR__ . '/boot.php';
 page_start('Forgot your password', ['bare' => true, 'main_class' => 'center']);
 ?>
 <div class="card signin">
-  <div class="group-avatar" aria-hidden="true"><?= h(config('group_emoji')) ?></div>
+  <?= group_avatar() ?>
   <h1>Forgot your password?</h1>
   <?php if (telegram_login_enabled()):
       $_SESSION['pw_reset_intent'] = time(); ?>

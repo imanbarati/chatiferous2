@@ -29,7 +29,13 @@
   }
 
   let posTimer = null;
-  const savePosSoon = () => { clearTimeout(posTimer); posTimer = setTimeout(savePos, 400); };
+  // The place is kept in localStorage, which is immediate; the messages it points into live in the
+  // copy on this device, which is not. Keeping them together means the place still finds something
+  // to land on when the signal has gone.
+  const savePosSoon = () => {
+    clearTimeout(posTimer);
+    posTimer = setTimeout(() => { savePos(); keepView(); }, 400);
+  };
 
   function atBottom(scroller) {
     return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 60;

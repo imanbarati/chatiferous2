@@ -41,6 +41,9 @@
   function showList(mode, push) {
     state.listMode = mode;
     if (push) history.pushState({}, '', APP.base + (mode === 'dms' ? 'messages' : ''));
+    // On a wide screen the empty right-hand pane should name what this list holds.
+    const empty = $('.chat-empty span');
+    if (empty) empty.textContent = mode === 'dms' ? 'Select a conversation' : 'Select a topic';
     renderTopics();
   }
 
@@ -51,7 +54,11 @@
       b = document.createElement('button');
       b.className = 'new-dm';
       b.setAttribute('aria-label', 'New message');
-      b.innerHTML = '✎';
+      // The same drawn pencil as the New topic button, for the same reason: the ✎ character comes
+      // out thin and small, and differently on every platform.
+      b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+        + '<path d="M16.8 3.2a2.7 2.7 0 0 1 3.8 3.8L8 19.6 3 21l1.4-5L16.8 3.2z"/>'
+        + '<path d="M15.2 4.8l4 4"/></svg>';
       b.addEventListener('click', openNewDm);
       $('.pane-list').appendChild(b);
     }
@@ -141,7 +148,17 @@
       state.topics = data.topics;
       if (!state.cursor) state.cursor = data.cursor;
       renderTopics();
+      localSave('topics', data.topics);
     } catch (e) {
+      // With no signal, the list this device last saw beats an error message where the topics were.
+      if (e.name === 'NoSignal' && !state.topics.length) {
+        const kept = await localLoad('topics');
+        if (kept && kept.length) {
+          state.topics = kept;
+          renderTopics();
+          return;
+        }
+      }
       if (!state.topics.length) topicsEl.innerHTML = `<p class="loading">${esc(e.message)}</p>`;
     }
   }

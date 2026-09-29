@@ -56,6 +56,16 @@ function parse_schedule_csv(string $path): array
             $problems[] = "Line $line ($date): no reading.";
             continue;
         }
+        // A range that ends before it starts — "1 Chronicles 6:50-48" — means the merging that
+        // produced this column took one passage's first verse and another's last. The reading is
+        // still shown, but it is said out loud rather than discovered months later by a reader.
+        if (preg_match_all('/(\d+):(\d+)\s*-\s*(\d+)(?!\s*[:\d])/', $text, $bad, PREG_SET_ORDER)) {
+            foreach ($bad as $b) {
+                if ((int)$b[3] < (int)$b[2]) {
+                    $problems[] = "Line $line ($date): \"{$b[0]}\" ends before it starts.";
+                }
+            }
+        }
         $rows[] = [$d->format('Y-m-d'), mb_substr($text, 0, 500)];
     }
     fclose($fh);
@@ -79,10 +89,15 @@ function readings_for(string $date): array
     return q('SELECT text FROM reading_schedule WHERE reading_date = ? ORDER BY position', [$date])->fetchAll(PDO::FETCH_COLUMN);
 }
 
-// "👉 Sat., Sep 19, 2026: ⏎ <readings>", the bot's exact format.
+// "👉 Sat., Sep 19, 2026: ⏎ <readings>", the bot's exact format, with a link to the day's own
+// page in the reader — the whole passage in one piece, with a button to say you've finished.
 function reading_text(string $date, array $readings): string
 {
-    return '👉 ' . date('D., M j, Y', strtotime($date . ' 12:00 UTC')) . ": \n" . implode("\n", $readings);
+    $text = '👉 ' . date('D., M j, Y', strtotime($date . ' 12:00 UTC')) . ": \n" . implode("\n", $readings);
+    if (config('bible_reader')) {
+        $text .= "\n📖 [Read](" . url('reading/' . $date) . ')';
+    }
+    return $text;
 }
 
 // Posts the reading and poll for $date unless already posted. Returns a status line.

@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'chapter' => (int)($_POST['chapter'] ?? 0),
         'verse' => (int)($_POST['verse'] ?? 0),
         'end_verse' => (int)($_POST['end_verse'] ?? 0),
-        'colour' => (string)($_POST['colour'] ?? ''),
+        'color' => (string)($_POST['color'] ?? ''),
         'body' => (string)($_POST['body'] ?? ''),
         'version' => (string)($_POST['version'] ?? ''),
     ]);

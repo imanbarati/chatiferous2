@@ -1,5 +1,5 @@
 <?php
-// POST topic, muted=1|0: mute or unmute notifications (and the unread badge colour) for one topic.
+// POST topic, muted=1|0: mute or unmute notifications (and the unread badge color) for one topic.
 require __DIR__ . '/../boot.php';
 require APP_DIR . '/lib/api.php';
 

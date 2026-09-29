@@ -40,7 +40,7 @@ page_start('Invite someone', ['back' => '', 'heading' => 'Invite someone']);
   <?php if ($left !== 0): ?>
   <form method="post" class="stack">
     <?= csrf_field() ?>
-    <label>Who it’s for (optional)<input name="note" maxlength="200" placeholder="e.g. my neighbour Ann"></label>
+    <label>Who it’s for (optional)<input name="note" maxlength="200" placeholder="e.g. my neighbor Ann"></label>
     <button class="primary">Create invite link</button>
   </form>
   <?php endif ?>
@@ -49,7 +49,7 @@ page_start('Invite someone', ['back' => '', 'heading' => 'Invite someone']);
 <h2 class="section">Your invites</h2>
 <ul class="list compact">
   <?php foreach ($mine as $i):
-    $state = $i['joined'] ? 'joined: ' . $i['joined'] : ($i['revoked_at'] ? 'cancelled' : ($i['expires_at'] && strtotime($i['expires_at'] . ' UTC') < time() ? 'expired' : 'not used yet')); ?>
+    $state = $i['joined'] ? 'joined: ' . $i['joined'] : ($i['revoked_at'] ? 'canceled' : ($i['expires_at'] && strtotime($i['expires_at'] . ' UTC') < time() ? 'expired' : 'not used yet')); ?>
   <li><div class="grow"><strong><?= h($i['note'] !== '' ? $i['note'] : 'Invite') ?></strong>
     <div class="small muted"><?= h(substr($i['created_at'], 0, 10)) ?> · <?= h($state) ?></div></div>
     <?php if ($state === 'not used yet'): ?><button class="link" data-copy="<?= h(invite_link($i['code'])) ?>">Copy</button><?php endif ?>

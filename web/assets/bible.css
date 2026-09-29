@@ -24,6 +24,7 @@ body.bible-app:not(.b-paper) { --b-muted: var(--muted); --b-rule: var(--divider)
   transition: transform .22s ease;
 }
 .b-bar.b-bar-away { transform: translateY(-101%); }
+
 /* The magnifier is a glyph in the bar, not a button with a box round it. */
 .b-search {
   background: none; border: 0; color: inherit; font-size: 1.05rem; line-height: 1;
@@ -37,6 +38,11 @@ body.bible-app:not(.b-paper) { --b-muted: var(--muted); --b-rule: var(--divider)
    handled as page turns. */
 .b-page { flex: 1; width: 100%; max-width: 38rem; margin: 0 auto; padding: 1rem 1.25rem 3rem; touch-action: pan-y; overflow-x: clip; }
 .b-chapter { will-change: transform; }
+/* The margins either side of the column turn the page (see bible.js). */
+@media (min-width: 760px) {
+  body.bible-app { cursor: default; }
+  body.bible-app:not(.b-marks-page) main.b-page { cursor: auto; }
+}
 .b-title { font-size: 1.5rem; margin: .4rem 0 1rem; font-weight: 600; padding-left: 1.1rem; }
 /* The text is inset a little, leaving a gutter for the note dots. */
 .b-chapter { font-size: var(--b-size, 1.12rem); line-height: var(--b-lead, 1.65); padding-left: 1.1rem; }
@@ -53,15 +59,28 @@ body.bible-app:not(.b-paper) { --b-muted: var(--muted); --b-rule: var(--divider)
 .b-ms { font-size: 1.15rem; font-weight: 600; margin: 1.6rem 0 .6rem; text-align: center; }
 .b-r, .b-mr, .b-sp { font-size: .85rem; color: var(--b-muted); font-style: italic; margin: -.2rem 0 .7rem; }
 .b-d { font-size: .9rem; color: var(--b-muted); font-style: italic; margin-bottom: .6rem; }
-.nd { font-variant: small-caps; }
+/* The divine name. The source has it as LORD, so rather than font-variant — whose synthetic small
+   caps sit at x-height and come out too small — the capitals themselves are set a little smaller
+   and the initial put back to full size. One number to tune, and it stays a capital throughout. */
+.nd { font-size: .80em; }
+.nd::first-letter { font-size: 1.25em; }   /* 1 / .80, so the L matches the text around it */
 .add { font-style: italic; opacity: .85; }
 
 /* Verse numbers: quiet, but a tap target for the commentary link. The dark theme's accent is a
-   deep purple that disappears against the page, so the numbers get a lighter colour of their own. */
+   deep purple that disappears against the page, so the numbers get a lighter color of their own. */
+/* A shade larger than a typographer would set them: they are tapped, not just read. */
 .b-chapter .vn {
-  font-size: .62em; font-weight: 600; color: var(--b-vn, var(--accent)); vertical-align: .45em;
-  margin-right: .18em; cursor: pointer; padding: 0 .1em; text-decoration: none;
+  font-size: .72em; font-weight: 600; color: var(--b-vn, var(--accent)); vertical-align: .38em;
+  margin-right: .2em; cursor: pointer; text-decoration: none;
+  /* Padding above and below an inline number widens what a thumb can hit without moving a
+     single line of the text. */
+  padding: .45em .16em;
+  /* A number is something you tap, not prose: a hold on one should open the sheet, not start
+     selecting it. */
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
+/* Nor should a finger still down after the sheet opens go on selecting the text behind it. */
+body:has(.b-sheet) .b-chapter { user-select: none; -webkit-user-select: none; }
 :root[data-theme="dark"] body.bible-app:not(.b-paper) { --b-vn: #9fb6d8; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) body.bible-app:not(.b-paper) { --b-vn: #9fb6d8; }
@@ -99,10 +118,13 @@ body.b-notes-inline .b-chapter .fn, body.b-notes-inline .b-chapter .xr { display
 
 /* The cross-reference list */
 .b-xlist { list-style: none; margin: 0; padding: 0; }
-.b-xlist li { border-top: 1px solid var(--divider); }
-.b-xlist button { display: block; width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: .6rem .1rem; font: inherit; }
-.b-xlist .b-xref { display: block; color: var(--accent); font-size: .85rem; font-weight: 600; margin-bottom: .1rem; }
+.b-xlist li { border-top: 1px solid var(--divider); padding: .6rem .1rem; }
+/* The row's own button is the verse text; the little translation buttons beside the reference are
+   styled by .b-xver and must not be caught by this. */
+.b-xlist .b-xgo { display: block; width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: 0; font: inherit; }
+.b-xlist .b-xref { color: var(--accent); font-size: .85rem; font-weight: 600; }
 .b-xlist .b-xtext { display: block; font-size: .95rem; line-height: 1.45; }
+.b-xlist li > button:not(.b-xgo) { display: block; width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: 0; font: inherit; }
 .b-loading { color: var(--muted); }
 
 /* Words of Jesus */
@@ -123,7 +145,21 @@ body.b-font-legible .b-chapter { font-family: "Atkinson Hyperlegible", Verdana, 
 .b-sheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--panel); color: var(--text);
   border-top: 1px solid var(--divider); border-radius: 14px 14px 0 0; padding: 1rem 1.25rem calc(1rem + env(safe-area-inset-bottom));
-  box-shadow: 0 -4px 20px rgba(0,0,0,.18); max-height: 50dvh; overflow-y: auto;
+  box-shadow: 0 -1px 0 var(--b-rule), 0 -10px 34px rgba(0,0,0,.28);
+  max-height: 50dvh; overflow-y: auto;
+  /* A drag that reaches the end of the sheet stops there instead of passing to the chapter behind,
+     which on a phone rubber-bands the page and carries this pinned sheet along with it. */
+  overscroll-behavior: contain;
+}
+/* The parts of the sheet that are not a scrolling surface: a drag on them should do nothing at
+   all. (Not on .b-sheet itself — the verse sheet scrolls when its buttons don't fit.) */
+.b-comm-head, .b-comm-foot, .b-look { touch-action: none; }
+/* The sheet sits over the chapter, so the join wants to be plain: a defined edge along the top,
+   and a shadow deep enough to lift it off the text. */
+.b-sheet { border-top: 2px solid var(--divider); }
+:root[data-theme="dark"] .b-sheet { box-shadow: 0 -1px 0 rgba(255,255,255,.14), 0 -12px 36px rgba(0,0,0,.6); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .b-sheet { box-shadow: 0 -1px 0 rgba(255,255,255,.14), 0 -12px 36px rgba(0,0,0,.6); }
 }
 .b-sheet h3 { margin: 0 0 .4rem; font-size: .9rem; color: var(--muted); font-weight: 600; }
 .b-sheet p { margin: 0 0 .5rem; font-size: 1rem; line-height: 1.5; }
@@ -137,18 +173,78 @@ body.b-font-legible .b-chapter { font-family: "Atkinson Hyperlegible", Verdana, 
 .b-doneline { color: var(--b-muted); }
 
 /* What you can do with a verse */
+/* The publisher's own words, under a translation we read from API.Bible rather than hold. */
+.b-notice {
+  margin: 2rem 0 0; padding-top: .8rem; border-top: 1px solid var(--b-rule);
+  font-size: .78rem; line-height: 1.5; color: var(--b-muted, var(--muted));
+}
 .b-quoted { font-size: .95rem; line-height: 1.45; color: var(--muted); margin: 0 0 .8rem; }
+/* A button on a sheet needs its own surface: in the dark theme the page's background is nearly
+   black and the sheet is only a little lighter, so a button colored like the page disappears
+   into it. These sit a step above the sheet, with an edge you can see. */
+:root { --b-btn: var(--bg); --b-btn-edge: var(--divider); }
+:root[data-theme="dark"] { --b-btn: #34343a; --b-btn-edge: #55555e; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --b-btn: #34343a; --b-btn-edge: #55555e; }
+}
+
 .b-acts { display: flex; flex-wrap: wrap; gap: .5rem; }
-.b-acts button { flex: 1 1 8rem; background: var(--bg); border: 1px solid var(--divider); border-radius: 10px; color: inherit; font-size: .95rem; padding: .6rem .8rem; }
+.b-acts button { flex: 1 1 8rem; background: var(--b-btn); border: 1px solid var(--b-btn-edge); border-radius: 10px; color: inherit; font-size: .95rem; padding: .6rem .8rem; }
 
 /* Search */
 .b-find { position: fixed; inset: 0; z-index: 40; background: var(--panel); color: var(--text); display: flex; flex-direction: column; }
 .b-find header { display: flex; gap: .5rem; align-items: center; padding: calc(.6rem + env(safe-area-inset-top)) .8rem .6rem; border-bottom: 1px solid var(--divider); }
+/* The words sit in their own box so Clear can sit at the end of them. Clear empties the words;
+   the ✕ outside closes the search altogether. */
+.b-find-box { flex: 1; position: relative; display: flex; }
+.b-find-box input { padding-right: 4.1rem; }
+.b-clear {
+  position: absolute; right: .35rem; top: 50%; transform: translateY(-50%);
+  border: 1px solid var(--b-rule); border-radius: 999px; background: var(--b-btn);
+  color: var(--muted); font: inherit; font-size: .72rem; font-weight: 600;
+  padding: .12rem .5rem; cursor: pointer;
+}
+.b-clear:hover { border-color: var(--accent); color: var(--accent); }
+/* The browser's own ✕ inside a search field would make two of them. */
+.b-find input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 .b-find input { flex: 1; font-size: 1rem; padding: .45rem .6rem; border-radius: 10px; border: 1px solid var(--divider); background: var(--bg); color: inherit; }
 .b-scopes { display: flex; gap: .4rem; overflow-x: auto; padding: .6rem .8rem; border-bottom: 1px solid var(--divider); }
 .b-scopes button { flex: none; background: var(--bg); border: 1px solid var(--divider); border-radius: 999px; color: inherit; font-size: .85rem; padding: .35rem .8rem; }
 .b-scopes button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .b-hits { flex: 1; overflow-y: auto; padding: .4rem 1rem 2rem; }
+/* Which translations are being looked in: the same chips as the scope row, ticked in any number. */
+.b-vers button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* Said once, at the top, when the translation being read isn't one of the ones searched. */
+.b-find-note {
+  margin: 0; padding: .55rem 1rem; font-size: .82rem; line-height: 1.45;
+  background: var(--accent-soft); color: var(--text); border-bottom: 1px solid var(--divider);
+}
+.b-find-syntax { font-size: .82rem; color: var(--muted); }
+.b-find-syntax b { font-weight: 600; color: inherit; }
+/* Books…: every book, ticked in any combination. */
+.b-books-pick { max-height: 46vh; overflow-y: auto; padding: 0 1rem .6rem; border-bottom: 1px solid var(--divider); }
+.b-books-acts { display: flex; gap: .5rem; justify-content: flex-end; margin: .7rem 0 .2rem; }
+.b-books-acts button {
+  min-height: 2.2rem; padding: .3rem .9rem; font-size: .9rem; border-radius: 9px;
+  border: 1px solid var(--b-btn-edge); background: var(--b-btn); color: inherit; cursor: pointer;
+}
+.b-books-acts button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* A result: the reference, the translations the words turn up in, then the wording of the first
+   of them. Tapping the words reads the verse in whatever is being read; tapping a translation
+   reads it in that one. */
+.b-xhead { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; margin-bottom: .2rem; }
+.b-xvers { display: flex; gap: .25rem; flex-wrap: wrap; }
+.b-xver {
+  padding: .1rem .45rem; border-radius: 999px; border: 1px solid var(--b-rule);
+  background: none; color: var(--muted); font: inherit; font-size: .72rem; font-weight: 600;
+  cursor: pointer;
+}
+.b-xver:hover { border-color: var(--accent); color: var(--accent); }
+.b-xver.on { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.b-xgo {
+  display: block; width: 100%; text-align: left; margin: .15rem 0 0; padding: 0;
+  border: 0; background: none; color: inherit; font: inherit; line-height: 1.5; cursor: pointer;
+}
 .b-hint, .b-count { color: var(--muted); font-size: .9rem; }
 .b-goto { display: block; width: 100%; text-align: left; background: var(--accent-soft, rgba(51,144,236,.12)); border: 0; border-radius: 10px; color: inherit; font-size: 1rem; padding: .7rem .9rem; margin: .5rem 0; }
 .b-hits mark { background: rgba(255, 213, 79, .45); color: inherit; border-radius: 3px; }
@@ -156,6 +252,12 @@ body.b-font-legible .b-chapter { font-family: "Atkinson Hyperlegible", Verdana, 
 /* The book and chapter picker */
 .b-picker { position: fixed; inset: 0; z-index: 40; background: var(--panel); color: var(--text); display: flex; flex-direction: column; }
 .b-picker header { display: flex; gap: .5rem; align-items: center; padding: .6rem .8rem; border-bottom: 1px solid var(--divider); }
+/* The close button on a full-screen panel: a glyph, not a browser's grey box. */
+.b-close {
+  flex: none; width: 2.4rem; height: 2.4rem; border: 0; border-radius: 50%;
+  background: none; color: var(--b-muted, var(--muted)); font-size: 1.1rem; cursor: pointer;
+}
+.b-close:hover { background: var(--b-btn, var(--bg)); color: inherit; }
 .b-picker input { flex: 1; font-size: 1rem; padding: .45rem .6rem; border-radius: 10px; border: 1px solid var(--divider); background: var(--bg); color: inherit; }
 .b-picker .b-list { flex: 1; overflow-y: auto; padding: .4rem 0 2rem; }
 .b-picker .b-group { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: .8rem 1rem .3rem; }
@@ -170,6 +272,16 @@ body.b-font-legible .b-chapter { font-family: "Atkinson Hyperlegible", Verdana, 
 .b-chapters button { aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--divider); background: var(--bg); color: inherit; font-size: .95rem; }
 .b-chapters button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+/* On a wide screen the picker holds its content in a column and sets the books in three, rather
+   than running one name per line across the whole window. The search panel does the same. */
+@media (min-width: 760px) {
+  .b-picker header, .b-find header { max-width: 46rem; width: 100%; margin-inline: auto; }
+  .b-picker .b-list, .b-find .b-hits, .b-find .b-scopes { max-width: 46rem; width: 100%; margin-inline: auto; }
+  .b-picker .b-books { columns: 3; column-gap: 1.5rem; }
+  .b-picker button.b-bk { break-inside: avoid; }
+  .b-chapters { grid-template-columns: repeat(auto-fill, minmax(3.4rem, 1fr)); }
+}
+
 /* Version chooser */
 /* Fixed, not absolute: an absolutely-positioned menu on a scrolled page opens above the screen,
    where taps appear to do nothing. */
@@ -179,7 +291,7 @@ body.b-font-legible .b-chapter { font-family: "Atkinson Hyperlegible", Verdana, 
 
 /* ---------- a person's own marks ---------- */
 /* The tint sits behind the words rather than over them, so the text keeps its contrast in both
-   themes: in the dark one the colours are dimmed to a wash. */
+   themes: in the dark one the colors are dimmed to a wash. */
 .b-chapter .b-hl { border-radius: 3px; padding: .06em 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .b-chapter .b-hl-yellow { background: #fff3a8; }
 .b-chapter .b-hl-green  { background: #c7f0c2; }
@@ -216,7 +328,7 @@ body.b-plain .b-flag { display: none; }
 .b-sw-yellow { background: #ffe97a; } .b-sw-green { background: #a8e6a0; }
 .b-sw-blue { background: #a6d2ff; } .b-sw-pink { background: #ffb8d5; }
 .b-sw-orange { background: #ffc588; }
-.b-sw-off { background: var(--bg); color: var(--muted); font-size: .9rem; }
+.b-sw-off { background: var(--b-btn); border-color: var(--b-btn-edge); color: var(--muted); font-size: .9rem; }
 .b-notebox {
   width: 100%; box-sizing: border-box; margin: 0 0 .7rem; padding: .6rem;
   border: 1px solid var(--divider); border-radius: 10px; background: var(--bg); color: inherit;
@@ -247,8 +359,46 @@ body.b-plain .b-flag { display: none; }
 .b-import { margin: 0 0 1rem; display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
 
 /* ---------- the commentary sheet ---------- */
-.b-comm { max-height: 76vh; display: flex; flex-direction: column; }
+/* One commentary fills the sheet; the next is a swipe to the left. */
+/* A definite height, not just a limit: the pages inside are sized against it, and without one
+   they grow to the length of the commentary and the chapter behind scrolls instead. */
+.b-comm {
+  height: 76dvh; max-height: 76dvh; overflow: hidden;
+  display: flex; flex-direction: column;
+}
 .b-comm-body { overflow-y: auto; -webkit-overflow-scrolling: touch; margin: 0 0 .7rem; }
+.b-comm-head { display: flex; align-items: center; gap: .3rem; margin: 0 0 .5rem; }
+.b-comm-name { flex: 1; min-width: 0; text-align: center; }
+.b-comm-name .b-comm-who {
+  display: block; font-size: .95rem; font-weight: 700; color: var(--accent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.b-comm-name .b-comm-when { display: block; font-size: .76rem; color: var(--muted); }
+.b-comm-step {
+  flex: none; width: 2.2rem; height: 2.2rem; border: 0; border-radius: 50%;
+  background: none; color: var(--accent); font-size: 1.5rem; line-height: 1; cursor: pointer;
+}
+.b-comm-step:disabled { color: var(--divider); cursor: default; }
+/* The track is the window; the rail inside it is what moves, so the pages either side stay
+   hidden. (Transforming the window itself would carry its own clipping along with it.) */
+.b-comm-track { flex: 1; min-height: 0; overflow: hidden; margin: 0 0 .7rem; }
+.b-comm-rail { display: flex; gap: 16px; height: 100%; will-change: transform; }   /* RAIL_GAP in bible.js */
+.b-comm-page {
+  flex: 0 0 100%; height: 100%; box-sizing: border-box;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: .2rem;
+  overscroll-behavior: contain;      /* reaching the end doesn't move the chapter behind */
+  touch-action: pan-y;
+}
+.b-comm-page p { margin: 0 0 .55rem; font-size: .97rem; line-height: 1.55; }
+/* On a wide screen the comment keeps a readable column, as the Bible text does. */
+/* A sheet spans the window, but what it says belongs under the column it refers to: a note on a
+   verse read at the far left of a wide screen, with the verse itself in the middle, is a note
+   about nothing in particular. */
+@media (min-width: 760px) {
+  /* 38rem is the column, 1.25rem the page's own padding and 1.1rem the chapter's: together they
+     put a sheet's first word exactly under the first word of a verse. */
+  .b-sheet { padding-inline: max(1.25rem, calc((100% - 38rem) / 2 + 2.35rem)); }
+}
 .b-comm-wait { color: var(--muted); }
 .b-comm-entry { margin: 0 0 .9rem; }
 .b-comm-entry summary {
@@ -261,7 +411,7 @@ body.b-plain .b-flag { display: none; }
 .b-comm-entry:not([open]) summary { margin-bottom: 0; padding-bottom: .55rem; border-bottom: 1px solid var(--b-rule); }
 .b-comm-entry p { margin: 0 0 .55rem; font-size: .97rem; line-height: 1.55; }
 .b-comm-more {
-  flex: 1 1 8rem; text-align: center; background: var(--bg); border: 1px solid var(--divider);
+  flex: 1 1 8rem; text-align: center; background: var(--b-btn); border: 1px solid var(--b-btn-edge);
   border-radius: 10px; color: inherit; font-size: .95rem; padding: .6rem .8rem; text-decoration: none;
 }
 .b-works { overflow-y: auto; max-height: 56vh; margin: 0 0 .7rem; }
@@ -273,3 +423,82 @@ body.b-plain .b-flag { display: none; }
 .b-work-name { grid-column: 2; grid-row: 1; font-size: .98rem; line-height: 1.3; }
 .b-work-when { grid-column: 2; grid-row: 2; font-size: .78rem; line-height: 1.3; color: var(--muted); }
 .b-work-away .b-work-name, .b-work-away .b-work-when { opacity: .55; }
+
+/* Three small buttons under the commentary: which works, Bible Hub, and how it's set. */
+.b-comm-foot { gap: .45rem; justify-content: center; }
+.b-comm-foot button, .b-comm-foot .b-comm-more {
+  flex: 1 1 0; min-width: 0; max-width: 11rem;      /* not the width of the window */
+  padding: .55rem .4rem; font-size: .9rem;
+}
+.b-comm-foot [data-comm="look"] { flex: 0 0 3.2rem; max-width: 3.2rem; font-weight: 600; }
+
+/* How the commentary reads: a panel over the foot of the sheet, the text still visible behind. */
+.b-look {
+  /* Inside the sheet's own column, not the whole window: left/right 0 is the sheet's content
+     edge, and the panel is no wider than it needs to be. */
+  /* Sitting over the row of buttons, not part-way through it: 4rem was a guess at that row's
+     height and landed across the middle of it. */
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+  max-width: 22rem; margin-inline: auto;
+  background: var(--panel); border: 1px solid var(--divider); border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.22); padding: .5rem .6rem;
+  display: flex; flex-direction: column; gap: .4rem;
+}
+.b-look-row { display: flex; align-items: center; gap: .4rem; }
+.b-look-row > span { flex: 1; color: var(--muted); font-size: .85rem; }
+.b-look-row button {
+  flex: 0 0 auto; min-height: 2.2rem; padding: .3rem .7rem; font-size: .9rem;
+  border: 1px solid var(--b-btn-edge); border-radius: 9px; background: var(--b-btn); color: inherit;
+}
+.b-look-faces button { flex: 1 1 0; }
+.b-look-faces button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.b-look [data-look="done"] { flex: 1; }
+
+/* The commentary's own face and size, apart from the Bible text's. */
+.b-comm-page { font-size: var(--c-size, 1rem); line-height: var(--c-lead, 1.55); }
+.b-comm-page p { font-size: inherit; line-height: inherit; }
+body.b-cfont-serif .b-comm-page { font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; }
+body.b-cfont-system .b-comm-page { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+body.b-cfont-legible .b-comm-page { font-family: "Atkinson Hyperlegible", Verdana, sans-serif; letter-spacing: .01em; }
+
+/* A pointer wants to be told what it is over. */
+.b-acts button:hover, .b-comm-more:hover, .b-look-row button:hover, .b-sw:hover {
+  background: var(--b-btn-hover); border-color: var(--b-btn-edge-hover);
+}
+.b-comm-step:not(:disabled):hover { background: var(--b-btn); }
+:root { --b-btn-hover: #e9e9ee; --b-btn-edge-hover: #c9c9d1; }
+:root[data-theme="dark"] { --b-btn-hover: #43434b; --b-btn-edge-hover: #6d6d78; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --b-btn-hover: #43434b; --b-btn-edge-hover: #6d6d78; }
+}
+
+/* The curated commentary: a capsule of the point, then who made it, then the comment itself. */
+.b-comm-page .c-cap { margin: 1.1em 0 .3em; }
+.b-comm-page .c-cap strong { font-weight: 600; }
+.b-comm-page .c-attr { color: var(--muted); font-style: italic; white-space: nowrap; }
+
+/* "Commentary: Full screen". The sheet stops being a sheet and takes the whole screen, so nothing
+   of the chapter shows beneath it — the square corners say so, and the top inset keeps the first
+   line clear of the notch. */
+body.b-commfull .b-comm {
+  top: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
+/* The verse the commentary is about, above it. Set apart from the commentary's own prose: the
+   reference in the muted colour, the words themselves in italic, and a rule beneath. */
+.b-comm-verse {
+  margin: 0 0 .7rem; padding: 0 0 .7rem;
+  border-bottom: 1px solid var(--divider);
+  font-style: italic; font-size: .96rem; line-height: 1.45;
+}
+.b-comm-ref { font-style: normal; font-weight: 600; color: var(--muted); margin-right: .35rem; }
+/* The way out. Always there, and the only way out when the commentary covers the screen. */
+.b-comm-close {
+  flex: 0 0 auto; border: 0; background: none; color: var(--muted);
+  font-size: 1rem; line-height: 1; padding: .35rem .1rem .35rem .5rem; cursor: pointer;
+}
+.b-comm-vn { font-style: normal; font-weight: 600; font-size: .8em; color: var(--muted); margin-right: .15em; }

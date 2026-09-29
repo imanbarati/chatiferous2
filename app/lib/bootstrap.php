@@ -32,6 +32,19 @@ function config_default(string $key, array $cfg)
     };
 }
 
+// The group's picture: the app's own icon, so the site looks like itself wherever it appears.
+// An installation with no icons of its own falls back to the emoji in its config.
+function group_avatar(string $class = ''): string
+{
+    $file = APP_WEB_DIR . '/' . config('app_icons') . 'icon-192.png';
+    $classes = trim('group-avatar ' . $class);
+    if (!is_file($file)) {
+        return '<div class="' . h($classes) . '" aria-hidden="true">' . h(config('group_emoji')) . '</div>';
+    }
+    return '<img class="' . h($classes) . '" src="' . h(url(config('app_icons') . 'icon-192.png'))
+        . '?v=' . app_version() . '" alt="" aria-hidden="true">';
+}
+
 function h(?string $s): string
 {
     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');

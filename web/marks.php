@@ -98,7 +98,7 @@ $tab = fn($k, $label) => '<a class="b-tab' . ($kind === $k ? ' on' : '') . '" hr
         }
         $text = bible_mark_text($version, $m);
     ?>
-      <article class="b-mark b-kind-<?= h($m['kind']) ?><?= $m['colour'] ? ' b-c-' . h($m['colour']) : '' ?>">
+      <article class="b-mark b-kind-<?= h($m['kind']) ?><?= $m['color'] ? ' b-c-' . h($m['color']) : '' ?>">
         <a class="b-mark-ref" href="<?= url('read/' . $m['book'] . '/' . $m['chapter']) ?>?v=<?= h($version) ?>#v<?= (int)$m['verse'] ?>">
           <?= h($m['ref']) ?>
         </a>

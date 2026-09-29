@@ -5,7 +5,7 @@
 
 const AVATAR_SIZE = 256;
 
-// Crops $src (any image GD reads) to a centred square and stores it as the user's photo.
+// Crops $src (any image GD reads) to a centered square and stores it as the user's photo.
 function save_avatar(int $user_id, string $src, string $source): bool
 {
     ini_set('memory_limit', '512M');

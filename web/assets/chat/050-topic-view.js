@@ -12,7 +12,29 @@
 
   // The frame around a conversation: the top bar (with the pin bar and search), the scrolling
   // area, and the message box. Drawn once when a topic opens.
+  // Everything the shell shows about a topic. The shell is drawn twice when a topic opens — once
+  // from what the list already knew, again from what the server sent — and almost always the two
+  // say exactly the same thing. Rebuilding it the second time throws away the message box along
+  // with anything typed into it while the messages were on their way, so it is rebuilt only when
+  // something on it has really changed.
+  function shellSignature(t) {
+    const u = t.kind === 'dm' ? (state.users[t.partner] || {}) : {};
+    return JSON.stringify([t.id, t.kind || '', t.title || '', t.general || 0, t.emoji || '',
+      t.color || 0, t.icon || '', t.partner || 0, t.i_blocked || 0,
+      u.name || '', u.username || '', u.pending || 0]);
+  }
+
   function chatShell(t) {
+    const sig = shellSignature(t);
+    if (chatEl.dataset.shell === sig && $('.messages', chatEl)) return;
+    // When it must be redrawn for the same topic, what is half-written keeps its place and its
+    // caret: a changed title is no reason to lose a sentence.
+    const was = chatEl.dataset.shell && JSON.parse(chatEl.dataset.shell)[0] === t.id
+      ? $('.composer textarea', chatEl) : null;
+    const kept = was && was.value
+      ? { value: was.value, start: was.selectionStart, end: was.selectionEnd, focused: document.activeElement === was }
+      : null;
+    chatEl.dataset.shell = sig;
     const dm = t.kind === 'dm', u = dm ? (state.users[t.partner] || { name: '' }) : null;
     const head = dm
       ? `<a class="bar-back" href="${APP.base}messages" aria-label="Back to messages">‹</a>
@@ -47,6 +69,14 @@
       </div>
       <input type="file" class="file-input photo-input" multiple accept="image/jpeg,image/png,image/gif,image/webp" hidden>
       <input type="file" class="file-input any-input" multiple hidden>`;
+    if (kept) {
+      const ta = $('.composer textarea', chatEl);
+      if (ta) {
+        ta.value = kept.value;
+        try { ta.setSelectionRange(kept.start, kept.end); } catch (e) { /* not focusable yet */ }
+        if (kept.focused) ta.focus();
+      }
+    }
   }
 
   // One message: bubble, author, time, ticks, attachments and reactions. Whether it joins the

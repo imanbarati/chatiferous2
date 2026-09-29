@@ -73,6 +73,8 @@
         root.style.removeProperty('--app-h');
         window.scrollTo(0, 0);   // undo iOS's leftover shift after the keyboard closes
       }
+      // The message box may grow to a share of the screen; the keyboard just changed what that is.
+      try { autosize(); } catch (e) { /* no topic open */ }
     };
     vv.addEventListener('resize', fit);
     vv.addEventListener('scroll', fit);

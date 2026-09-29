@@ -5,14 +5,29 @@ body.chat-app { height: 100vh; height: 100dvh; overflow: hidden; padding: 0; bac
 
 .app { height: 100%; display: flex; }
 .pane-list, .pane-chat { height: 100%; display: flex; flex-direction: column; min-width: 0; }
-.pane-list { flex: 1; background: var(--panel); }
+.pane-list { flex: 1; background: var(--list-bg, var(--panel)); }
 .pane-chat { flex: 1; display: none; position: relative; }
 body.chat-open .pane-list { display: none; }
 body.chat-open .pane-chat { display: flex; }
 
-/* Wide screens: topic list on the left, open topic on the right. */
+/* Wide screens: topic list on the left, open topic on the right. The list is one fixed width
+   whatever the window does — it holds the same names and the same dates either way, and a list
+   that shrinks with the window ends up cutting the group's name short. Below the breakpoint the
+   list isn't squeezed, it steps aside altogether and the topic fills the screen. */
 @media (min-width: 926px) {
-  .pane-list { flex: 0 0 clamp(18rem, 30vw, 26.5rem); border-right: 1px solid var(--divider); }
+  /* The edge of the sidebar wants to be visible without being bright — in the dark theme the
+     ordinary divider is nearly the color of the panel it sits on. It appears only in this
+     layout: with the list alone on screen there is no edge to mark. */
+  .pane-list { flex: 0 0 24rem; border-right: 1px solid var(--pane-edge, var(--divider)); }
+  /* The list's own bar is as tight as a phone's, since the pane is a phone's width. */
+  .pane-list .bar { padding-left: .6rem; padding-right: .5rem; }
+  .pane-list .bar .group-avatar.sm { width: 38px; height: 38px; font-size: 21px; }
+  .pane-list .bar .bar-name { font-size: 1rem; }
+  .pane-list .bar .bar-icon, .pane-list .bar .search-open, .pane-list .bar .menu summary { width: 2.15rem; }
+  .pane-list .bar .bar-icon svg { width: 25px; height: 25px; }
+  .pane-list .bar .bar-icon { margin-right: .25rem; }
+  .pane-list .bar .bar-icon + .search-open { margin-left: -.4rem; }
+  .pane-list .bar .search-open + .menu, .pane-list .bar .bar-icon + .menu { margin-left: -.6rem; }
   .pane-chat, body.chat-open .pane-chat { display: flex; }
   body.chat-open .pane-list { display: flex; }
   .chat-bar .bar-back { display: none; }
@@ -39,6 +54,22 @@ body.chat-open .pane-chat { display: flex; }
 .topic.active::before, .topic.active + .topic::before { display: none; }
 .topic.active { background: var(--accent); color: #fff; }
 .topic.active .topic-time, .topic.active .topic-preview, .topic.active .sender { color: #fff; }
+:root[data-theme="dark"] .topic.active,
+:root[data-theme="dark"] .topic.active:hover {
+  background: #3a3a42; color: var(--text); box-shadow: inset 3px 0 0 var(--accent);
+}
+:root[data-theme="dark"] .topic.active .topic-time,
+:root[data-theme="dark"] .topic.active .topic-preview,
+:root[data-theme="dark"] .topic.active .sender { color: var(--muted); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .topic.active,
+  :root:not([data-theme="light"]) .topic.active:hover {
+    background: #3a3a42; color: var(--text); box-shadow: inset 3px 0 0 var(--accent);
+  }
+  :root:not([data-theme="light"]) .topic.active .topic-time,
+  :root:not([data-theme="light"]) .topic.active .topic-preview,
+  :root:not([data-theme="light"]) .topic.active .sender { color: var(--muted); }
+}
 .topic-main { flex: 1; min-width: 0; display: grid; gap: .1rem; }
 .topic-row { display: flex; align-items: center; gap: .4rem; min-width: 0; }
 .topic-title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -65,7 +96,7 @@ body.chat-open .pane-chat { display: flex; }
 .ticon { flex: none; width: 46px; height: 46px; display: grid; place-items: center; }
 .ticon svg { width: 100%; height: 100%; }
 
-/* A topic's picture: a rounded square tinted with its colour, and the symbol in the colour
+/* A topic's picture: a rounded square tinted with its color, and the symbol in the color
    opposite it on the wheel — a blue square carries an orange symbol, a green one magenta. Every
    pair clears WCAG AA (4.5:1) in both themes. */
 .ticon.square {
@@ -81,9 +112,9 @@ body.chat-open .pane-chat { display: flex; }
 
 
 
-/* Where the colour is the point — a red heart, a green tree, a gold crown, a blue whale — the
-   symbol itself is coloured, on a white square. White keeps it bright (no dusky backgrounds) and
-   lets the colour be fully saturated. Written last, so it wins over the general colours. */
+/* Where the color is the point — a red heart, a green tree, a gold crown, a blue whale — the
+   symbol itself is colored, on a white square. White keeps it bright (no dusky backgrounds) and
+   lets the color be fully saturated. Written last, so it wins over the general colors. */
 .ticon.ti-burning-embers { --ic-top: #ffffff; --ic-bot: #e9edf2; --ic-fg: #dd4f00; }
 .ticon.ti-burning-tree { --ic-top: #ffffff; --ic-bot: #e9edf2; --ic-fg: #dc5800; }
 .ticon.ti-flame { --ic-top: #ffffff; --ic-bot: #e9edf2; --ic-fg: #dc5800; }
@@ -98,32 +129,32 @@ body.chat-open .pane-chat { display: flex; }
 .ticon.ti-burning-embers svg, .ticon.ti-burning-tree svg, .ticon.ti-flame svg, .ticon.ti-fruit-tree svg, .ticon.ti-hearts svg, .ticon.ti-mountains svg, .ticon.ti-olive svg, .ticon.ti-sperm-whale svg { filter: none; }
 .ticon-letter { font: 600 1.25rem/1 -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ic-fg); }
 .ticon.c0 { --ic-top: #3da8ff; --ic-bot: #0087f5; }
-.ticon.c1 { --ic-top: #ffb73d; --ic-bot: #f59a00; }
-.ticon.c2 { --ic-top: #c13dff; --ic-bot: #a600f5; }
-.ticon.c3 { --ic-top: #41ff3d; --ic-bot: #05f500; }
-.ticon.c4 { --ic-top: #ff3d83; --ic-bot: #f50058; }
+.ticon.c1 { --ic-top: #2ec4c4; --ic-bot: #00a0a0; }
+.ticon.c2 { --ic-top: #8f7bff; --ic-bot: #5b3fe0; }
+.ticon.c3 { --ic-top: #4cd964; --ic-bot: #1da83b; }
+.ticon.c4 { --ic-top: #ff6b5c; --ic-bot: #e02a1d; }
 .ticon.c5 { --ic-top: #ff723d; --ic-bot: #f54200; }
 :root[data-theme="dark"] {
   --ic-dark: 1;
 }
 :root[data-theme="dark"] .ticon.c0 { --ic-top: #249cff; --ic-bot: #0079db; }
-:root[data-theme="dark"] .ticon.c1 { --ic-top: #ffae24; --ic-bot: #db8a00; }
-:root[data-theme="dark"] .ticon.c2 { --ic-top: #b924ff; --ic-bot: #9500db; }
-:root[data-theme="dark"] .ticon.c3 { --ic-top: #28ff24; --ic-bot: #04db00; }
-:root[data-theme="dark"] .ticon.c4 { --ic-top: #ff2473; --ic-bot: #db004f; }
+:root[data-theme="dark"] .ticon.c1 { --ic-top: #1fb5b5; --ic-bot: #008c8c; }
+:root[data-theme="dark"] .ticon.c2 { --ic-top: #7f69f5; --ic-bot: #4e33cc; }
+:root[data-theme="dark"] .ticon.c3 { --ic-top: #35c74f; --ic-bot: #178f32; }
+:root[data-theme="dark"] .ticon.c4 { --ic-top: #f55a4b; --ic-bot: #c81f14; }
 :root[data-theme="dark"] .ticon.c5 { --ic-top: #ff5f24; --ic-bot: #db3b00; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .ticon.c0 { --ic-top: #249cff; --ic-bot: #0079db; }
-  :root:not([data-theme="light"]) .ticon.c1 { --ic-top: #ffae24; --ic-bot: #db8a00; }
-  :root:not([data-theme="light"]) .ticon.c2 { --ic-top: #b924ff; --ic-bot: #9500db; }
-  :root:not([data-theme="light"]) .ticon.c3 { --ic-top: #28ff24; --ic-bot: #04db00; }
-  :root:not([data-theme="light"]) .ticon.c4 { --ic-top: #ff2473; --ic-bot: #db004f; }
+  :root:not([data-theme="light"]) .ticon.c1 { --ic-top: #1fb5b5; --ic-bot: #008c8c; }
+  :root:not([data-theme="light"]) .ticon.c2 { --ic-top: #7f69f5; --ic-bot: #4e33cc; }
+  :root:not([data-theme="light"]) .ticon.c3 { --ic-top: #35c74f; --ic-bot: #178f32; }
+  :root:not([data-theme="light"]) .ticon.c4 { --ic-top: #f55a4b; --ic-bot: #c81f14; }
   :root:not([data-theme="light"]) .ticon.c5 { --ic-top: #ff5f24; --ic-bot: #db3b00; }
 }
 
-/* Where a subject has an obvious colour, its square takes that colour and the symbol stays white:
+/* Where a subject has an obvious color, its square takes that color and the symbol stays white:
    the heart on red, tree and olive on green, flame on orange, crowns and harp on gold. Written
-   after the general colours above so they win. */
+   after the general colors above so they win. */
 .ticon.general { font-size: 1.6rem; color: var(--muted); font-weight: 500; }
 .ticon.emoji { font-size: 1.6rem; }
 .ticon.lg { width: 44px; height: 44px; }
@@ -236,17 +267,16 @@ button.chip { cursor: pointer; font: inherit; font-size: .88rem; }
 .poll { min-width: min(17rem, 60vw); }
 .poll-q { font-weight: 600; }
 .poll-kind { font-size: .8rem; color: var(--muted); margin-bottom: .35rem; }
-.opt { display: flex; gap: .5rem; align-items: flex-start; margin: .2rem 0; padding: .3rem .6rem .4rem 0; border-radius: 10px; }
-/* Your own answer: a tinted row, bold label and a solid check badge, so it's obvious at a glance. */
+.opt { display: flex; gap: .5rem; align-items: flex-start; margin: .2rem 0; padding: .3rem .6rem .4rem .4rem; border-radius: 10px; }
+/* Your own answer, said once: a filled dot, echoing the button you tapped, beside a faintly
+   tinted row. Not a ✓ — several of these polls answer in check marks themselves (☑️ ✅), and a
+   second one beside the first reads as part of the wording. The dot's column is on every row,
+   empty or not, so the percentages stay in line. */
 .opt.mine { background: var(--accent-soft); }
 .msg.out .opt.mine { background: rgba(0,0,0,.07); }
-.opt.mine .opt-text, .opt.mine .opt-note { font-weight: 600; color: var(--text); }
-.opt.mine .pct { color: var(--link); }
-.msg.out .opt.mine .pct { color: var(--out-accent); }
-/* Words, not a ✓: the reading poll's own answers (☑️ ✅) are already check marks. */
-.my-vote { display: inline-block; margin-left: .35rem; padding: .05rem .45rem; border-radius: 999px;
-  background: var(--pill); color: #fff; font-size: .72rem; font-weight: 700; letter-spacing: .02em; vertical-align: .1em; white-space: nowrap; }
-.msg.out .my-vote { background: var(--out-accent); color: var(--bubble-out); }
+.opt-mark { flex: none; width: 14px; height: 14px; border-radius: 50%; margin-top: .28rem; }
+.opt.mine .opt-mark { background: var(--accent); }
+.msg.out .opt.mine .opt-mark { background: var(--out-accent); }
 .pct { flex: none; width: 2.6rem; text-align: right; font-weight: 600; font-size: .85rem; padding-top: .1rem; }
 .radio { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--muted-badge); margin-top: .1rem; }
 .opt-body { flex: 1; display: grid; gap: .2rem; }
@@ -287,8 +317,25 @@ button.chip { cursor: pointer; font: inherit; font-size: .88rem; }
   padding: .7rem 1rem; border: 0; border-radius: 24px; background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.15);
 }
 .composer textarea:disabled { color: var(--muted); }
-.send { width: var(--tap); height: var(--tap); border-radius: 50%; border: 0; background: var(--accent); color: #fff; font-size: 1.2rem; flex: none; }
-.send:disabled { background: var(--muted-badge); }
+.send { width: var(--tap); height: var(--tap); border-radius: 50%; border: 0; background: var(--accent); color: #fff; font-size: 1.45rem; flex: none; }
+/* One button, one look, whether there is something to send or not. */
+.send:disabled { background: var(--accent); color: #fff; }
+/* Under the pointer it brightens and lifts: the same button, looking ready. Not wrapped in
+   (hover: hover) — that query is false in more places than it ought to be, and a hover style that
+   lingers for a moment after a tap is a smaller problem than one that never appears at all. */
+.send { transition: background .15s ease, transform .15s ease, box-shadow .15s ease; }
+.send:hover:not(:disabled) {
+  background: var(--send-hover);
+  transform: scale(1.08);
+  box-shadow: 0 4px 14px var(--send-hover-glow);
+}
+.send:active:not(:disabled) { transform: scale(.96); }
+/* Deeper than the button at rest, not paler: a stronger version of the same blue. */
+:root { --send-hover: #1b7ad6; --send-hover-glow: rgba(27,122,214,.45); }
+:root[data-theme="dark"] { --send-hover: #6f5bd6; --send-hover-glow: rgba(111,91,214,.5); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --send-hover: #6f5bd6; --send-hover-glow: rgba(111,91,214,.5); }
+}
 
 .viewer { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.92); display: grid; place-items: center; }
 .viewer img { max-width: 100vw; max-height: 100vh; max-height: 100dvh; object-fit: contain; }
@@ -440,7 +487,7 @@ body.chat-app { height: var(--app-h, 100dvh); }
 
 /* Wallpaper (optional, config 'wallpaper'): a doodle pattern (assets/wallpaper-1.svg)
    drawn over the chat background, like Telegram's. The pattern is a mask, so its
-   lines take whatever colour/gradient --wp-lines gives them. */
+   lines take whatever color/gradient --wp-lines gives them. */
 .pane-chat { background: var(--wallpaper); isolation: isolate; }
 .wallpaper .pane-chat::before {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
@@ -466,10 +513,18 @@ body.chat-app { height: var(--app-h, 100dvh); }
 .ptr.spin circle { stroke-dasharray: 70 100; transition: stroke-dasharray .2s; }
 .ptr-settle { transition: transform .28s cubic-bezier(.2, .8, .2, 1), top .28s cubic-bezier(.2, .8, .2, 1); }
 @keyframes ptr-spin { to { transform: rotate(360deg); } }
-.new-topic {
+.new-topic, .new-dm {
   position: absolute; right: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom)); z-index: 5;
   width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent); color: #fff;
-  font-size: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.new-topic svg, .new-dm svg {
+  width: 27px; height: 27px; fill: none; stroke: currentColor;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+}
+/* A pointer is precise; a thumb is not. The pencil is a little smaller on a desktop. */
+@media (min-width: 926px) {
+  .new-topic svg, .new-dm svg { width: 23px; height: 23px; stroke-width: 1.8; }
 }
 .field-label { font-size: .92rem; color: var(--muted); margin-bottom: -.4rem; }
 .swatches { display: flex; gap: .5rem; }
@@ -491,7 +546,7 @@ body.chat-app { height: var(--app-h, 100dvh); }
 .search-open { width: var(--tap); height: var(--tap); border: 0; background: none; font-size: 1.2rem; border-radius: 50%; flex: none; }
 .search-open:hover { background: var(--hover); }
 .search-panel { position: fixed; inset: 0; z-index: 30; background: var(--panel); display: flex; flex-direction: column; }
-@media (min-width: 926px) { .search-panel { right: auto; width: clamp(18rem, 30vw, 26.5rem); border-right: 1px solid var(--divider); } }
+@media (min-width: 926px) { .search-panel { right: auto; width: 24rem; border-right: 1px solid var(--pane-edge, var(--divider)); } }
 .search-input { flex: 1; font: inherit; font-size: 1rem; min-height: 44px; padding: .5rem .9rem; border-radius: 22px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
 .search-scope { padding: .5rem 1rem; font-size: .9rem; color: var(--muted); border-bottom: 1px solid var(--divider); }
 .search-results { flex: 1; overflow-y: auto; }
@@ -570,7 +625,10 @@ body.chat-app { height: var(--app-h, 100dvh); }
 .rx { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 
 /* Unread reactions: a heart badge in the topic list and a ❤ button in the topic (as in Telegram) */
-.badge.rx-new { padding: 0; width: 24px; background: #e53935; color: #fff; font-size: .72rem; }
+/* Red disc, white heart — and it stays that way on the open topic, where badges otherwise
+   invert to a white disc and the heart would vanish into it. */
+.badge.rx-new, .topic.active .badge.rx-new { padding: 0; width: 24px; background: #d32f2f; }
+.badge.rx-new svg { width: 14px; height: 14px; fill: #fff; }
 .to-reaction {
   position: absolute; right: max(1rem, env(safe-area-inset-right)); bottom: calc(9rem + env(safe-area-inset-bottom));
   width: 48px; height: 48px; border-radius: 50%; border: 0; color: #e53935; font-size: 1.25rem; z-index: 5;
@@ -616,11 +674,16 @@ body.chat-app { height: var(--app-h, 100dvh); }
 /* ---------- Direct messages ---------- */
 .dm-icon { border-radius: 50%; background: linear-gradient(#72d5fd, #2a9ef1); color: #fff; font-size: 1.25rem; }
 .dm-head { display: flex; align-items: center; gap: .4rem; padding: .3rem .6rem; min-height: var(--tap); border-bottom: 1px solid var(--divider); }
-.dm-back { width: 40px; height: 40px; border: 0; border-radius: 50%; background: none; color: var(--link); font-size: 1.8rem; line-height: 1; cursor: pointer; }
+/* The same arrow, at the same size, as every other Back in the app. Its ink sits low in the em
+   box, so it is nudged up to sit level with the word beside it. */
+.dm-back {
+  width: 40px; height: 40px; border: 0; border-radius: 50%; background: none;
+  color: var(--back-ink); font-size: 2.4rem; line-height: 1; cursor: pointer;
+  transform: translateY(-4px);
+}
 .dm-head strong { font-size: 1.05rem; }
 .avatar.dm-av { width: 42px; height: 42px; flex: none; font-size: .95rem; }
-.new-dm { position: absolute; right: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 50%;
-  border: 0; background: var(--accent); color: #fff; font-size: 1.4rem; box-shadow: 0 2px 8px rgba(0,0,0,.25); z-index: 5; cursor: pointer; }
+.new-dm { display: grid; place-items: center; cursor: pointer; }
 /* A name or picture you can tap to see the person */
 .who { border: 0; background: none; padding: 0; margin: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .msg > .who { flex: none; align-self: flex-end; }
@@ -662,3 +725,23 @@ body.chat-app { height: var(--app-h, 100dvh); }
 .done-btn { justify-self: center; min-height: 36px; padding: 0 1rem; border-radius: 999px; border: 1px solid var(--border);
   background: var(--hover); color: var(--text); font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; }
 .done-btn:hover { background: var(--popover-hover); }
+
+:root[data-theme="dark"] { --pane-edge: rgba(255,255,255,.16); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --pane-edge: rgba(255,255,255,.16); }
+}
+
+/* The day's reading: its link sits at the end of the first line, against the right margin. */
+.text .b-read { float: right; margin: 0 0 .15rem .9rem; white-space: nowrap; }
+.text .b-read a { text-decoration: underline; }
+
+/* No signal. A thin bar along the bottom, out of the way of the conversation but impossible to
+   miss, so nobody wonders why nothing new is arriving or why the message box won't take anything. */
+.offline-note {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  padding: .45rem .8rem calc(.45rem + env(safe-area-inset-bottom, 0px));
+  background: var(--muted); color: #fff; text-align: center;
+  font-size: .85rem; letter-spacing: .01em;
+}
+body.is-offline .composer textarea { opacity: .7; }
+body.is-offline .composer textarea::placeholder { font-style: italic; }

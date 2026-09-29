@@ -8,7 +8,7 @@
 // "### Verse 3" or "### Verses 4–9".
 //
 // Usage:
-//   php cli/import_commentary.php --works                 set up the catalogue (do this first)
+//   php cli/import_commentary.php --works                 set up the catalog (do this first)
 //   php cli/import_commentary.php <corpus dir>            import everything under it
 //   php cli/import_commentary.php <corpus dir> --book romans --chapter 11
 //   php cli/import_commentary.php <corpus dir> --only poole   just this work
@@ -25,16 +25,16 @@ $args = array_slice($argv, 1);
 $opt = fn($name, $default = null) => ($i = array_search('--' . $name, $args, true)) !== false
     ? ($args[$i + 1] ?? true) : $default;
 
-// ---------- the catalogue ----------
+// ---------- the catalog ----------
 if (in_array('--works', $args, true)) {
-    foreach (commentary_catalogue() as $w) {
-        q('INSERT INTO bible_works (code, name, edition, author, years, scope, source, licence, sort)
+    foreach (commentary_catalog() as $w) {
+        q('INSERT INTO bible_works (code, name, edition, author, years, scope, source, license, sort)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE name = VALUES(name), edition = VALUES(edition), author = VALUES(author),
-             years = VALUES(years), scope = VALUES(scope), licence = VALUES(licence), sort = VALUES(sort)',
-            [$w['code'], $w['name'], $w['edition'], $w['author'], $w['years'], $w['scope'], '', $w['licence'], $w['sort']]);
+             years = VALUES(years), scope = VALUES(scope), license = VALUES(license), sort = VALUES(sort)',
+            [$w['code'], $w['name'], $w['edition'], $w['author'], $w['years'], $w['scope'], '', $w['license'], $w['sort']]);
     }
-    echo count(commentary_catalogue()), " works in the catalogue.\n";
+    echo count(commentary_catalog()), " works in the catalog.\n";
     echo "Not imported until their standing is settled: ", implode(', ', commentary_unchecked()), "\n";
     exit(0);
 }
@@ -50,7 +50,7 @@ $onlyWork = (string)$opt('only', '');
 $onlyChapter = (int)$opt('chapter', 0);
 
 if (!q('SELECT COUNT(*) FROM bible_works')->fetchColumn()) {
-    fwrite(STDERR, "The catalogue is empty: run with --works first.\n");
+    fwrite(STDERR, "The catalog is empty: run with --works first.\n");
     exit(1);
 }
 $known = array_column(commentary_works(), 'code');
@@ -118,5 +118,5 @@ if ($done['skipped']) {
     echo "{$done['skipped']} files left out (copyright not settled): ", implode(', ', $skip), "\n";
 }
 foreach ($done['unknown'] as $work => $n) {
-    echo "Not in the catalogue, so left out: $work ($n files)\n";
+    echo "Not in the catalog, so left out: $work ($n files)\n";
 }

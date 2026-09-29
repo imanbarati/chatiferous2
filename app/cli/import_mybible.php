@@ -37,7 +37,7 @@ if (!is_file($file) || $work === '') {
     exit(1);
 }
 if (!$dry && !commentary_work($work)) {
-    fwrite(STDERR, "No work called “{$work}” in the catalogue (run import_commentary.php --works).\n");
+    fwrite(STDERR, "No work called “{$work}” in the catalog (run import_commentary.php --works).\n");
     exit(1);
 }
 
@@ -162,7 +162,9 @@ foreach ($chapters as $bookChapters) {
     }
 }
 $plain = strip_tags($sample);
-$refs = preg_match_all('/\b(?:Gen|Exod?|Lev|Num|Deut?|Ps|Isa|Jer|Ezek|Matt?|Mark|Luke|John|Acts|Rom|Cor|Gal|Eph|Phil|Col|Thess|Tim|Heb|Jas|Pet|Rev)\w*\.?\s+\d+[:.]\d+/u', $plain);
+// Both styles count: "Romans 8:28" and the older "Rom. viii. 28" that Haydock and Hodge use.
+$books = 'Gen|Exod?|Lev|Num|Deut?|Josh|Judg|Sam|King?|Chron|Ps|Prov|Isa|Jer|Ezek|Dan|Matt?|Mark|Luke|John|Acts|Rom|Cor|Gal|Eph|Phil|Col|Thess|Tim|Tit|Heb|Jas|Pet|Jude|Rev';
+$refs = preg_match_all("/\\b(?:$books)\\w*\\.?\\s+(?:\\d+[:.]\\d+|[ivxlc]+\\.\\s*\\d+)/u", $plain);
 $dangling = preg_match_all('/(?:\b(?:in|see|compare|cf\.?)\s*[,.]|,\s*[,.]|\(\s*\))/u', $plain);
 
 $books = count($chapters);

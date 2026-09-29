@@ -49,7 +49,7 @@
         }
       }
     } catch (e) {
-      console.warn(e);
+      if (e.name !== 'NoSignal') console.warn(e);   // no signal is a state, not a fault to log
     } finally {
       state.syncing = false;
       scheduleSync();

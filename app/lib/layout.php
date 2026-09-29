@@ -74,7 +74,7 @@ function avatar_url(array $user): ?string
     return $user['avatar_path'] ? url('avatar.php?u=' . (int)$user['id'] . '&v=' . (int)$user['avatar_version']) : null;
 }
 
-// Round avatar: the member's photo, or initials in their Telegram-style colour.
+// Round avatar: the member's photo, or initials in their Telegram-style color.
 function avatar(string $name, int $color_index, string $size = '', ?string $photo = null): string
 {
     if ($photo) {

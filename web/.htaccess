@@ -2,6 +2,13 @@
 # host's PHP-version handler.)
 Options -Indexes
 
+# PHP's own limits are raised for this folder in .user.ini and php.ini beside this file — not
+# here: the AddHandler above runs PHP as CGI, where php_value in .htaccess is ignored.
+# Neither of those is anybody's business but PHP's.
+<FilesMatch "^(php\.ini|\.user\.ini)$">
+	Require all denied
+</FilesMatch>
+
 # Own rewrite context, so the WordPress/MemberPress rules in the parent folder
 # (which send .pdf/.zip/.docx etc. to a paywall script) don't apply here.
 RewriteEngine On

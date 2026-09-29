@@ -36,10 +36,10 @@ if ($inv && $_SERVER['REQUEST_METHOD'] === 'POST') {
 page_start('Join', ['bare' => true, 'main_class' => 'center']);
 ?>
 <div class="card signin">
-  <div class="group-avatar" aria-hidden="true"><?= h(config('group_emoji')) ?></div>
+  <?= group_avatar() ?>
   <h1><?= h(config('group_name')) ?></h1>
   <?php if (!$inv): ?>
-    <p>This invite link has expired, been used up, or been cancelled.</p>
+    <p>This invite link has expired, been used up, or been canceled.</p>
     <p class="small muted">Please ask whoever sent it for a new one. Already a member? <a href="<?= url('login.php') ?>">Sign in</a>.</p>
   <?php else: ?>
     <p class="muted"><?= $target

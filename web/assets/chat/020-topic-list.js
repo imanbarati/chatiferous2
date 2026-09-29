@@ -23,7 +23,11 @@
       // isn't bold: the topic's own name is the bold thing in the row.
       const sender = last && last.name && !last.preview.startsWith(last.name)
         ? `<span class="topic-row"><span class="topic-sender">${esc(last.mine ? 'You' : last.name)}</span></span>` : '';
-      const badges = (t.reactions ? '<span class="badge rx-new" title="New reactions to your messages">❤</span>' : '')
+      // A drawn heart rather than the ❤ character, which every platform renders as a red emoji:
+      // it ignores the colour it is given and so came out red on a red badge.
+      const badges = (t.reactions ? '<span class="badge rx-new" title="New reactions to your messages">'
+        + '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.6l-1.6-1.45C4.9 14.2 1.5 11.1 1.5 7.3 1.5 4.4 3.8 2.1 6.7 2.1c1.6 0 3.2.76 4.2 2l1.1 1.3 1.1-1.3c1-1.24 2.6-2 4.2-2 2.9 0 5.2 2.3 5.2 5.2 0 3.8-3.4 6.9-8.9 11.85L12 20.6z"/></svg>'
+        + '</span>' : '')
         + (t.mentions ? '<span class="badge at" title="Mentions">@</span>' : '')
         + (t.unread ? `<span class="badge ${t.muted ? 'muted' : ''}">${t.unread > 999 ? '999+' : t.unread}</span>` : '')
         + (!t.unread && !t.mentions && t.pinned ? '<span class="pin-icon" title="Pinned">📌</span>' : '');

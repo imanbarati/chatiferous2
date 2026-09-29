@@ -3,22 +3,48 @@
 
   // Takes a chosen photo or file: shows it in the strip at once and starts sending it, so it's
   // usually ready by the time the message is.
+  // A photo off a phone is 3-12 MB and several times wider than any screen that will show it, and
+  // the server shrinks it to this same size on arrival. Doing it here instead means that on a slow
+  // connection you send one megabyte rather than ten.
+  //
+  // Only JPEG, which is what cameras produce: re-encoding a PNG or a WebP would flatten any
+  // transparency it has onto black.
+  const PHOTO_EDGE = 2560;
+  async function shrinkPhoto(file) {
+    if (file.type !== 'image/jpeg') return file;
+    let bmp;
+    // from-image so a photo taken sideways stays the way up its EXIF says.
+    try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) { return file; }
+    const scale = Math.min(1, PHOTO_EDGE / Math.max(bmp.width, bmp.height));
+    if (scale === 1) { bmp.close?.(); return file; }
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    bmp.close?.();
+    const small = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85));
+    // A photo already smaller than we'd manage is left as it came.
+    if (!small || small.size >= file.size) return file;
+    return new File([small], file.name, { type: 'image/jpeg', lastModified: file.lastModified });
+  }
+
   function addUpload(file) {
     const key = Math.random().toString(36).slice(2);
     const item = { key, file, id: 0, status: 'uploading', url: file.type.startsWith('image/') ? URL.createObjectURL(file) : '' };
     state.uploads.push(item);
-    renderUploads();
+    renderUploads();          // the strip shows the photo at once, while it is still being made ready
     const v = state.view;
-    if (v?.topic.kind === 'dm') {   // sealed on this device before it leaves
-      convKey(v.topic).then(async (ck) => {
+    shrinkPhoto(file).then(async (photo) => {
+      if (v?.topic.kind === 'dm') {   // sealed on this device before it leaves
+        const ck = await convKey(v.topic);
         if (!ck) throw new Error('This conversation is still locked on this device.');
-        const { sealed, meta } = await sealForUpload(file, ck);
+        const { sealed, meta } = await sealForUpload(photo, ck);
         item.meta = meta;
         sendUpload(item, sealed, true);
-      }).catch((e) => { item.status = 'failed'; toast(e.message); renderUploads(); });
-      return;
-    }
-    sendUpload(item, file, false);
+        return;
+      }
+      sendUpload(item, photo, false);
+    }).catch((e) => { item.status = 'failed'; toast(e.message); renderUploads(); });
   }
 
   // Uploads one file. Sealed files go up as bytes with no name: the server can't read them.

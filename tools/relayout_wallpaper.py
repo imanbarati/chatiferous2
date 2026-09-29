@@ -2,7 +2,7 @@
 """Evenly re-spaces the symbols in web/assets/wallpaper-1.svg.
 
 The tile is 900x900 and repeats, so distances wrap around the edges. Every
-symbol is pushed away from any neighbour that is too close until the spacing
+symbol is pushed away from any neighbor that is too close until the spacing
 is even; the two copies of the same symbol are kept at least TWIN_GAP apart.
 Sizes and rotations are kept. The dots are then dropped into the emptiest spots.
 The tile is written out as the 3x3 set of translated copies the page expects.
@@ -17,7 +17,7 @@ import sys
 PATH = 'web/assets/wallpaper-1.svg'
 TILE = 900
 TWIN_GAP = 380      # minimum distance between two copies of the same symbol
-SPACING = 1.7       # neighbour distance, as a multiple of the two symbols' mean size (high enough that they must fill the tile)
+SPACING = 1.7       # neighbor distance, as a multiple of the two symbols' mean size (high enough that they must fill the tile)
 
 random.seed(int(sys.argv[1]) if len(sys.argv) > 1 else 7)
 s = open(PATH).read()

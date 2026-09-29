@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """WCAG contrast check for every text/background pair, in both themes.
-Reads the colour settings from web/assets/app.css. Normal text needs 4.5:1;
+Reads the color settings from web/assets/app.css. Normal text needs 4.5:1;
 large or bold UI text (names, badges, buttons) needs 3:1."""
 import re, sys
 
@@ -64,7 +64,7 @@ PAIRS = [
     ('white on muted badge', '#ffffff', '--muted-badge', 3),
     ('error text', '--error-text', '--error-bg', 4.5),
     ('notice text', '--text', '--ok-bg', 4.5),
-] + [(f'sender name colour {i} in bubbles', f'--n{i}', '--bubble-in', 3) for i in range(7)]
+] + [(f'sender name color {i} in bubbles', f'--n{i}', '--bubble-in', 3) for i in range(7)]
 
 def resolve(x, theme):
     return rgba(x if x.startswith('#') else f'var({x})', theme)
@@ -80,7 +80,7 @@ for name, theme in (('LIGHT', light), ('DARK', dark)):
             b = resolve(bg, theme)
         f = over(resolve(fg, theme), b)
         rows.append((desc, ratio(f, b), need))
-    # White text on the see-through date/service chips, over the lightest wallpaper colour.
+    # White text on the see-through date/service chips, over the lightest wallpaper color.
     chip = resolve('--chip-bg', theme)
     worst = min(ratio([255, 255, 255, 1], over(chip, s)) for s in wallpaper_stops(theme))
     rows.append(('white text on date/service chips (worst spot)', worst, 4.5))

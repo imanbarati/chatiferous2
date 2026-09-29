@@ -32,6 +32,8 @@ $app = [
     'csrf'     => csrf_token(),
     'version'  => $version,
     'versions' => bible_versions(),
+    // The ones read from API.Bible a chapter at a time: they can't be kept on the device.
+    'fetched'  => api_bible_versions(),
     'book'     => $ch['book'],
     'chapter'  => $ch['chapter'],
     'biblehub' => (bool)config('biblehub_links'),
@@ -76,6 +78,7 @@ $app = [
       <button type="button" data-set="numbers">Verse numbers: <span data-val="numbers">On</span></button>
       <button type="button" data-set="notes">Footnotes: <span data-val="notes">Markers</span></button>
       <button type="button" data-set="xrefs">Cross-references: <span data-val="xrefs">On</span></button>
+      <button type="button" data-set="commfull">Commentary: <span data-val="commfull">With the text</span></button>
       <button type="button" data-set="plain">Reading view: <span data-val="plain">Off</span></button>
       <button type="button" data-offline>Read offline: <span data-val="offline">Off</span></button>
       <a href="<?= url('marks') ?>">My marks</a>
@@ -92,6 +95,9 @@ $app = [
            data-xrefs="<?= h(json_encode($ch['xrefs'])) ?>">
     <h1 class="b-title"><?= h($ch['name']) ?> <?= (int)$ch['chapter'] ?></h1>
     <?= $ch['html'] ?>
+    <?php if (!empty($ch['notice'])): ?>
+      <p class="b-notice"><?= h($ch['notice']) ?></p>
+    <?php endif ?>
   </article>
 </main>
 
