@@ -1,0 +1,275 @@
+/* The Bible reader: a page that should read like a book, not like a web page.
+   Settings (font, size, background, red letters, verse numbers, footnotes, reading view) are
+   classes on <body>, set by assets/bible.js from what the member chose. */
+
+body.bible-app {
+  min-height: 100dvh;
+  display: flex; flex-direction: column;
+  background: var(--b-bg, var(--bg));
+  color: var(--b-fg, var(--text));
+  /* Room for the bar, which is fixed: sticky can't be relied on inside the installed app on iOS. */
+  padding-top: calc(3.1rem + env(safe-area-inset-top));
+}
+
+/* Backgrounds: the app's own, or paper for reading in sunlight. */
+body.bible-app.b-paper { --b-bg: #f6efe2; --b-fg: #2c2621; --b-muted: #8a7f70; --b-rule: #e0d5c2; }
+body.bible-app:not(.b-paper) { --b-muted: var(--muted); --b-rule: var(--divider); }
+
+/* The book and chapter stay in view; the bar slides away as you read down and returns when you
+   pull up (assets/bible.js). */
+.b-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+  background: var(--b-bg, var(--panel)); border-bottom: 1px solid var(--b-rule);
+  padding-top: env(safe-area-inset-top);
+  transition: transform .22s ease;
+}
+.b-bar.b-bar-away { transform: translateY(-101%); }
+/* The magnifier is a glyph in the bar, not a button with a box round it. */
+.b-search {
+  background: none; border: 0; color: inherit; font-size: 1.05rem; line-height: 1;
+  padding: .35rem .4rem; border-radius: 8px;
+}
+.b-search:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+.b-where { flex: 1; text-align: left; font-size: 1.05rem; font-weight: 600; color: inherit; background: none; border: 0; padding: .2rem 0; }
+.b-version { border: 1px solid var(--b-rule); border-radius: 999px; padding: .15rem .6rem; font-size: .8rem; color: inherit; background: none; }
+
+/* The page itself. touch-action lets the reader scroll up and down while sideways swipes are
+   handled as page turns. */
+.b-page { flex: 1; width: 100%; max-width: 38rem; margin: 0 auto; padding: 1rem 1.25rem 3rem; touch-action: pan-y; overflow-x: clip; }
+.b-chapter { will-change: transform; }
+.b-title { font-size: 1.5rem; margin: .4rem 0 1rem; font-weight: 600; padding-left: 1.1rem; }
+/* The text is inset a little, leaving a gutter for the note dots. */
+.b-chapter { font-size: var(--b-size, 1.12rem); line-height: var(--b-lead, 1.65); padding-left: 1.1rem; }
+.b-chapter p { margin: 0 0 .75rem; }
+.b-chapter .b-q1, .b-chapter .b-q2, .b-chapter .b-q3, .b-chapter .b-q4 { margin-bottom: .1rem; }
+.b-q1 { padding-left: 1.2rem; text-indent: -1.2rem; }
+.b-q2 { padding-left: 2.4rem; text-indent: -1.2rem; }
+.b-q3, .b-q4 { padding-left: 3.4rem; text-indent: -1.2rem; }
+.b-pi, .b-mi, .b-li1 { padding-left: 1.2rem; }
+.b-li2 { padding-left: 2.4rem; }
+.b-pc, .b-qc { text-align: center; }
+.b-b { height: .7rem; }
+.b-s, .b-s2 { font-size: 1rem; font-weight: 600; margin: 1.4rem 0 .5rem; }
+.b-ms { font-size: 1.15rem; font-weight: 600; margin: 1.6rem 0 .6rem; text-align: center; }
+.b-r, .b-mr, .b-sp { font-size: .85rem; color: var(--b-muted); font-style: italic; margin: -.2rem 0 .7rem; }
+.b-d { font-size: .9rem; color: var(--b-muted); font-style: italic; margin-bottom: .6rem; }
+.nd { font-variant: small-caps; }
+.add { font-style: italic; opacity: .85; }
+
+/* Verse numbers: quiet, but a tap target for the commentary link. The dark theme's accent is a
+   deep purple that disappears against the page, so the numbers get a lighter colour of their own. */
+.b-chapter .vn {
+  font-size: .62em; font-weight: 600; color: var(--b-vn, var(--accent)); vertical-align: .45em;
+  margin-right: .18em; cursor: pointer; padding: 0 .1em; text-decoration: none;
+}
+:root[data-theme="dark"] body.bible-app:not(.b-paper) { --b-vn: #9fb6d8; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body.bible-app:not(.b-paper) { --b-vn: #9fb6d8; }
+}
+body.b-nonums .b-chapter .vn { display: none; }
+
+/* Footnote and cross-reference markers */
+.b-chapter .fn, .b-chapter .xr {
+  font-size: .62em; vertical-align: .45em; color: var(--b-muted); cursor: pointer; padding: 0 .12em;
+}
+.b-chapter .xr { color: var(--accent); opacity: .65; }
+body.b-nonotes .b-chapter .fn, body.b-nonotes .b-chapter .xr { display: none; }
+/* Reading view: nothing but the words. */
+body.b-plain .b-chapter .vn, body.b-plain .b-chapter .fn, body.b-plain .b-chapter .xr,
+body.b-plain .b-dot { display: none; }
+
+/* Notes shown in place, for people who'd rather not tap */
+.b-inline-note { display: none; font-size: .82em; color: var(--b-muted); margin: .1rem 0 .6rem; padding-left: 1rem; border-left: 2px solid var(--b-rule); }
+body.b-notes-inline .b-inline-note { display: block; }
+body.b-notes-inline .b-chapter .fn, body.b-notes-inline .b-chapter .xr { display: none; }
+
+/* A verse with a note gets a dot in the margin: visible, thumb-sized, out of the way. */
+.b-dot {
+  position: absolute; left: -1.1rem; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent); opacity: .55; border: 0; padding: 0; cursor: pointer;
+}
+.b-dot.x { background: #8a63d2; }
+
+/* Cross-references: one word in the verse carries a dotted underline; tapping it opens the list. */
+.b-chapter .xr-word {
+  text-decoration: underline dotted; text-decoration-color: color-mix(in srgb, var(--b-muted) 70%, transparent);
+  text-underline-offset: .25em; text-decoration-thickness: 1px; cursor: pointer;
+}
+.b-flash { background: rgba(120, 170, 255, .28); border-radius: 4px; transition: background .8s; }
+
+/* The cross-reference list */
+.b-xlist { list-style: none; margin: 0; padding: 0; }
+.b-xlist li { border-top: 1px solid var(--divider); }
+.b-xlist button { display: block; width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: .6rem .1rem; font: inherit; }
+.b-xlist .b-xref { display: block; color: var(--accent); font-size: .85rem; font-weight: 600; margin-bottom: .1rem; }
+.b-xlist .b-xtext { display: block; font-size: .95rem; line-height: 1.45; }
+.b-loading { color: var(--muted); }
+
+/* Words of Jesus */
+body.b-red .wj { color: #b3261e; }
+body.b-red.b-paper .wj { color: #a5231c; }
+@media (prefers-color-scheme: dark) { body.b-red:not(.b-paper) .wj { color: #ff8a80; } }
+
+/* Fonts */
+body.b-font-serif .b-chapter { font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; }
+body.b-font-system .b-chapter { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+body.b-font-legible .b-chapter { font-family: "Atkinson Hyperlegible", Verdana, sans-serif; letter-spacing: .01em; }
+
+/* Chapter steps at the foot of the page */
+.b-steps { display: flex; justify-content: space-between; gap: 1rem; max-width: 38rem; margin: 0 auto 2rem; padding: 0 1.25rem calc(1rem + env(safe-area-inset-bottom)); }
+.b-steps a { color: var(--accent); text-decoration: none; font-size: .95rem; }
+
+/* The note sheet */
+.b-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--panel); color: var(--text);
+  border-top: 1px solid var(--divider); border-radius: 14px 14px 0 0; padding: 1rem 1.25rem calc(1rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 20px rgba(0,0,0,.18); max-height: 50dvh; overflow-y: auto;
+}
+.b-sheet h3 { margin: 0 0 .4rem; font-size: .9rem; color: var(--muted); font-weight: 600; }
+.b-sheet p { margin: 0 0 .5rem; font-size: 1rem; line-height: 1.5; }
+.b-sheet .b-xref { color: var(--accent); }
+
+/* Today's reading */
+.b-fixed { pointer-events: none; }
+.b-none { color: var(--b-muted); }
+.b-finish { margin: 2rem 0 1rem; text-align: center; }
+.b-finish .primary { padding: .7rem 1.4rem; font-size: 1rem; }
+.b-doneline { color: var(--b-muted); }
+
+/* What you can do with a verse */
+.b-quoted { font-size: .95rem; line-height: 1.45; color: var(--muted); margin: 0 0 .8rem; }
+.b-acts { display: flex; flex-wrap: wrap; gap: .5rem; }
+.b-acts button { flex: 1 1 8rem; background: var(--bg); border: 1px solid var(--divider); border-radius: 10px; color: inherit; font-size: .95rem; padding: .6rem .8rem; }
+
+/* Search */
+.b-find { position: fixed; inset: 0; z-index: 40; background: var(--panel); color: var(--text); display: flex; flex-direction: column; }
+.b-find header { display: flex; gap: .5rem; align-items: center; padding: calc(.6rem + env(safe-area-inset-top)) .8rem .6rem; border-bottom: 1px solid var(--divider); }
+.b-find input { flex: 1; font-size: 1rem; padding: .45rem .6rem; border-radius: 10px; border: 1px solid var(--divider); background: var(--bg); color: inherit; }
+.b-scopes { display: flex; gap: .4rem; overflow-x: auto; padding: .6rem .8rem; border-bottom: 1px solid var(--divider); }
+.b-scopes button { flex: none; background: var(--bg); border: 1px solid var(--divider); border-radius: 999px; color: inherit; font-size: .85rem; padding: .35rem .8rem; }
+.b-scopes button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.b-hits { flex: 1; overflow-y: auto; padding: .4rem 1rem 2rem; }
+.b-hint, .b-count { color: var(--muted); font-size: .9rem; }
+.b-goto { display: block; width: 100%; text-align: left; background: var(--accent-soft, rgba(51,144,236,.12)); border: 0; border-radius: 10px; color: inherit; font-size: 1rem; padding: .7rem .9rem; margin: .5rem 0; }
+.b-hits mark { background: rgba(255, 213, 79, .45); color: inherit; border-radius: 3px; }
+
+/* The book and chapter picker */
+.b-picker { position: fixed; inset: 0; z-index: 40; background: var(--panel); color: var(--text); display: flex; flex-direction: column; }
+.b-picker header { display: flex; gap: .5rem; align-items: center; padding: .6rem .8rem; border-bottom: 1px solid var(--divider); }
+.b-picker input { flex: 1; font-size: 1rem; padding: .45rem .6rem; border-radius: 10px; border: 1px solid var(--divider); background: var(--bg); color: inherit; }
+.b-picker .b-list { flex: 1; overflow-y: auto; padding: .4rem 0 2rem; }
+.b-picker .b-group { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: .8rem 1rem .3rem; }
+.b-picker button.b-bk { display: block; width: 100%; text-align: left; background: none; border: 0; color: inherit; font-size: 1rem; padding: .6rem 1rem; }
+.b-picker button.b-bk.on { color: var(--accent); font-weight: 600; }
+/* Recent chapters, at the top of the picker */
+.b-recent { display: flex; flex-wrap: wrap; gap: .4rem; padding: .2rem 1rem .6rem; }
+.b-chip { background: var(--bg); border: 1px solid var(--divider); border-radius: 999px; color: inherit; font-size: .9rem; padding: .4rem .8rem; }
+.b-chipv { color: var(--muted); font-size: .8em; }
+
+.b-chapters { display: grid; grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr)); gap: .4rem; padding: .6rem 1rem 1.5rem; }
+.b-chapters button { aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--divider); background: var(--bg); color: inherit; font-size: .95rem; }
+.b-chapters button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Version chooser */
+/* Fixed, not absolute: an absolutely-positioned menu on a scrolled page opens above the screen,
+   where taps appear to do nothing. */
+.b-versions { position: fixed; right: .6rem; top: calc(3.1rem + env(safe-area-inset-top)); z-index: 20; background: var(--panel); border: 1px solid var(--divider); border-radius: 12px; padding: .3rem; box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+.b-versions button { display: block; width: 100%; text-align: left; background: none; border: 0; color: inherit; font-size: .95rem; padding: .5rem .9rem; border-radius: 8px; }
+.b-versions button.on { color: var(--accent); font-weight: 600; }
+
+/* ---------- a person's own marks ---------- */
+/* The tint sits behind the words rather than over them, so the text keeps its contrast in both
+   themes: in the dark one the colours are dimmed to a wash. */
+.b-chapter .b-hl { border-radius: 3px; padding: .06em 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.b-chapter .b-hl-yellow { background: #fff3a8; }
+.b-chapter .b-hl-green  { background: #c7f0c2; }
+.b-chapter .b-hl-blue   { background: #c8e4ff; }
+.b-chapter .b-hl-pink   { background: #ffd4e6; }
+.b-chapter .b-hl-orange { background: #ffdcb5; }
+.b-chapter .b-hl { color: #1c1b18; }
+:root[data-theme="dark"] body.bible-app:not(.b-paper) .b-chapter .b-hl { color: inherit; }
+:root[data-theme="dark"] body.bible-app:not(.b-paper) .b-chapter .b-hl-yellow { background: #5c5320; }
+:root[data-theme="dark"] body.bible-app:not(.b-paper) .b-chapter .b-hl-green  { background: #29512a; }
+:root[data-theme="dark"] body.bible-app:not(.b-paper) .b-chapter .b-hl-blue   { background: #234260; }
+:root[data-theme="dark"] body.bible-app:not(.b-paper) .b-chapter .b-hl-pink   { background: #5d2c43; }
+:root[data-theme="dark"] body.bible-app:not(.b-paper) .b-chapter .b-hl-orange { background: #5e4021; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body.bible-app:not(.b-paper) .b-chapter .b-hl { color: inherit; }
+  :root:not([data-theme="light"]) body.bible-app:not(.b-paper) .b-chapter .b-hl-yellow { background: #5c5320; }
+  :root:not([data-theme="light"]) body.bible-app:not(.b-paper) .b-chapter .b-hl-green  { background: #29512a; }
+  :root:not([data-theme="light"]) body.bible-app:not(.b-paper) .b-chapter .b-hl-blue   { background: #234260; }
+  :root:not([data-theme="light"]) body.bible-app:not(.b-paper) .b-chapter .b-hl-pink   { background: #5d2c43; }
+  :root:not([data-theme="light"]) body.bible-app:not(.b-paper) .b-chapter .b-hl-orange { background: #5e4021; }
+}
+
+/* A bookmark or a note leaves a small flag at the end of the verse. */
+.b-flag {
+  background: none; border: 0; padding: 0 .15em; cursor: pointer; line-height: 1;
+  font-size: .72em; vertical-align: .2em; color: var(--accent);
+}
+.b-flag-bookmark { color: #d1584f; cursor: default; }
+body.b-plain .b-flag { display: none; }
+
+.b-swatches { display: flex; gap: .55rem; margin: 0 0 .7rem; }
+.b-sw { width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); cursor: pointer; }
+.b-sw.on { box-shadow: 0 0 0 2px var(--accent); }
+.b-sw-yellow { background: #ffe97a; } .b-sw-green { background: #a8e6a0; }
+.b-sw-blue { background: #a6d2ff; } .b-sw-pink { background: #ffb8d5; }
+.b-sw-orange { background: #ffc588; }
+.b-sw-off { background: var(--bg); color: var(--muted); font-size: .9rem; }
+.b-notebox {
+  width: 100%; box-sizing: border-box; margin: 0 0 .7rem; padding: .6rem;
+  border: 1px solid var(--divider); border-radius: 10px; background: var(--bg); color: inherit;
+  font: inherit; font-size: 1rem; resize: vertical;
+}
+
+/* ---------- the My marks screen ---------- */
+.b-marks { padding: 0 1rem 3rem; max-width: 40rem; margin: 0 auto; }
+.b-tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin: .8rem 0 1rem; }
+.b-tab {
+  font-size: .85rem; padding: .3rem .7rem; border-radius: 999px; text-decoration: none;
+  border: 1px solid var(--b-rule); color: var(--muted);
+}
+.b-tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.b-mark { border-bottom: 1px solid var(--b-rule); padding: .8rem 0; }
+.b-mark-ref { font-weight: 600; text-decoration: none; color: var(--accent); }
+.b-mark-text { margin: .35rem 0; line-height: 1.5; color: var(--muted); }
+.b-kind-note .b-mark-text { border-left: 4px solid var(--b-rule); padding-left: .6rem; }
+.b-kind-highlight .b-mark-text { border-left: 4px solid var(--b-rule); padding-left: .6rem; }
+.b-c-yellow.b-mark .b-mark-text { border-left-color: #ffe97a; }
+.b-c-green.b-mark .b-mark-text { border-left-color: #a8e6a0; }
+.b-c-blue.b-mark .b-mark-text { border-left-color: #a6d2ff; }
+.b-c-pink.b-mark .b-mark-text { border-left-color: #ffb8d5; }
+.b-c-orange.b-mark .b-mark-text { border-left-color: #ffc588; }
+.b-mark-note { margin: .45rem 0 .2rem; white-space: pre-wrap; line-height: 1.5; }
+.b-mark-when { margin: .2rem 0 0; font-size: .78rem; color: var(--muted); }
+.b-marks-note, .b-imported { font-size: .85rem; color: var(--muted); margin: 1.4rem 0 0; line-height: 1.5; }
+.b-import { margin: 0 0 1rem; display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+
+/* ---------- the commentary sheet ---------- */
+.b-comm { max-height: 76vh; display: flex; flex-direction: column; }
+.b-comm-body { overflow-y: auto; -webkit-overflow-scrolling: touch; margin: 0 0 .7rem; }
+.b-comm-wait { color: var(--muted); }
+.b-comm-entry { margin: 0 0 .9rem; }
+.b-comm-entry summary {
+  cursor: pointer; list-style: none; margin: 0 0 .3rem;
+  font-size: .82rem; font-weight: 700; letter-spacing: .01em; text-transform: uppercase;
+  color: var(--accent);
+}
+.b-comm-entry summary::-webkit-details-marker { display: none; }
+.b-comm-entry summary span + span { display: block; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.b-comm-entry:not([open]) summary { margin-bottom: 0; padding-bottom: .55rem; border-bottom: 1px solid var(--b-rule); }
+.b-comm-entry p { margin: 0 0 .55rem; font-size: .97rem; line-height: 1.55; }
+.b-comm-more {
+  flex: 1 1 8rem; text-align: center; background: var(--bg); border: 1px solid var(--divider);
+  border-radius: 10px; color: inherit; font-size: .95rem; padding: .6rem .8rem; text-decoration: none;
+}
+.b-works { overflow-y: auto; max-height: 56vh; margin: 0 0 .7rem; }
+.b-work {
+  display: grid; grid-template-columns: auto 1fr; align-items: center;
+  column-gap: .7rem; row-gap: 0; padding: .4rem .1rem; border-bottom: 1px solid var(--b-rule);
+}
+.b-work input { grid-column: 1; grid-row: 1 / span 2; width: 1.1rem; height: 1.1rem; }
+.b-work-name { grid-column: 2; grid-row: 1; font-size: .98rem; line-height: 1.3; }
+.b-work-when { grid-column: 2; grid-row: 2; font-size: .78rem; line-height: 1.3; color: var(--muted); }
+.b-work-away .b-work-name, .b-work-away .b-work-when { opacity: .55; }

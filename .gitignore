@@ -1,0 +1,10 @@
+app/config.php
+app/sessions/
+app/data/
+import/data/
+tests/node_modules/
+tools/.icon-cache/
+__pycache__/
+site.env
+app/config.test.php
+app/uploads/

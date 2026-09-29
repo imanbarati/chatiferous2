@@ -1,0 +1,2 @@
+# This folder must never be served. (It belongs outside the web folder; this is a safety net.)
+Require all denied

@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "description": "Browser test for Chatiferous (see run_browser_tests.sh)",
+  "dependencies": { "puppeteer-core": "^23.0.0" }
+}

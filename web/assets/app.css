@@ -1,0 +1,259 @@
+/* Chatiferous. Telegram's palette and shapes (values observed from Telegram Web),
+   with larger text and targets for readability. Phone first. */
+
+:root {
+  color-scheme: light;
+  --accent: #3390ec;
+  --pill: #1f6fc5;          /* accent dark enough for small white text (5:1) */
+  --accent-dark: #2a7bd0;
+  --accent-soft: rgba(51,144,236,.1);
+  --accent-ring: rgba(51,144,236,.5);
+  --link: #1f6cbf;
+  --bg: #f4f4f5;
+  --panel: #ffffff;
+  --hover: #f4f4f5;
+  --text: #000000;
+  --muted: #686d72;
+  --border: #dadce0;
+  --popover: #ffffff;
+  --popover-edge: rgba(0,0,0,.12);
+  --popover-hover: #f1f1f4;
+  --divider: #e7e7e9;
+  --danger: #d32f2f;
+  --ok-bg: #e7f6e9;
+  --error-bg: #fdecea;
+  --error-text: #9b1c1c;
+  --muted-badge: #8e9499;
+  --shadow: rgba(114,114,114,.25);
+  /* Chat */
+  --wallpaper: linear-gradient(135deg, #dbddbb 0%, #6ba587 35%, #d5d88d 70%, #88b884 100%);
+  --chip-bg: rgba(50, 80, 38, .8);
+  --bubble-in: #ffffff;
+  --bubble-out: #eeffde;
+  --meta: #6f757b;
+  --out-accent: #2f8a2c;
+  --out-meta: #2c7a2b;
+  --out-link: #1a64b3;
+  --out-soft: rgba(79,174,78,.15);
+  --code-bg: rgba(0,0,0,.05);
+  --spoiler: #9aa0a6;
+  --unread-bar: rgba(255,255,255,.88);
+  --wp-lines: #2d4a26;
+  --wp-opacity: .15;
+  --glass: rgba(255,255,255,.55);
+  --glass-edge: rgba(255,255,255,.7);
+  --glass-shine: rgba(255,255,255,.8);
+  --n0: #d45246; --n1: #c75f14; --n2: #6c61df; --n3: #2f8a2c; --n4: #177f73; --n5: #3a7fc0; --n6: #d0476a;
+  --radius: 12px;
+  --tap: 48px;
+  font-size: 17px;
+}
+
+/* Dark theme: Telegram's dark palette (Web A). theme.js sets data-theme on <html>,
+   following the device setting unless the member picked Light or Dark. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --accent: #8774e1;
+  --pill: #6a55d6;
+  --accent-dark: #9a89f0;
+  --accent-soft: rgba(135,116,225,.18);
+  --accent-ring: rgba(135,116,225,.6);
+  --link: #a99bff;
+  --bg: #0f0f0f;
+  --panel: #212121;
+  --hover: #2c2c2c;
+  --text: #ffffff;
+  --muted: #aaaaaa;
+  --border: #3b3b3d;
+  --popover: #2e2e32;
+  --popover-edge: #4a4a50;
+  --popover-hover: #3a3a3f;
+  --divider: #2f2f31;
+  --danger: #ff6b6b;
+  --ok-bg: #1f3324;
+  --error-bg: #3a1f1f;
+  --error-text: #ffb4ab;
+  --muted-badge: #717579;
+  --shadow: rgba(0,0,0,.45);
+  --wallpaper: linear-gradient(135deg, #0b0c16 0%, #110c1b 40%, #150b15 70%, #0b0e18 100%);
+  --chip-bg: rgba(72, 87, 97, .6);
+  --bubble-in: #34343b;
+  --bubble-out: #6456bd;
+  --meta: #a0a0a0;
+  --out-accent: #ffffff;
+  --out-meta: rgba(255,255,255,.88);
+  --out-link: #ffffff;
+  --out-soft: rgba(255,255,255,.16);
+  --code-bg: rgba(255,255,255,.09);
+  --spoiler: #5c5c5c;
+  --unread-bar: rgba(33,33,33,.92);
+  --wp-lines: linear-gradient(135deg, #6a5acd 0%, #8a4fbf 40%, #c0507e 70%, #4f6bd5 100%);
+  --wp-opacity: .42;
+  --glass: rgba(44,44,48,.5);
+  --glass-edge: rgba(255,255,255,.14);
+  --glass-shine: rgba(255,255,255,.1);
+  --n0: #ff8a7a; --n1: #ffa04d; --n2: #b3a6ff; --n3: #7dd87a; --n4: #5ed6c5; --n5: #74b8ff; --n6: #ff8fb1;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+a { color: var(--link); }
+h1 { font-size: 1.3rem; margin: 0 0 .25rem; line-height: 1.25; }
+button { font: inherit; cursor: pointer; }
+summary, [role="button"], [role="link"], label:has(> input[type="checkbox"], > input[type="radio"]) { cursor: pointer; }
+button:disabled { cursor: default; }
+.muted { color: var(--muted); }
+.small { font-size: .88rem; }
+
+/* ---- Top bar ---- */
+.bar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: .5rem;
+  min-height: 56px;
+  padding: calc(.25rem + env(safe-area-inset-top)) max(.75rem, env(safe-area-inset-right)) .25rem max(.75rem, env(safe-area-inset-left));
+  background: var(--panel);
+  border-bottom: 1px solid var(--divider);
+}
+.bar-back {
+  display: grid; place-items: center;
+  width: var(--tap); height: var(--tap); margin-left: -.5rem;
+  font-size: 2rem; line-height: 1; text-decoration: none; color: var(--accent);
+}
+.bar-title { flex: 1; min-width: 0; }
+.bar-name { font-weight: 600; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-sub { color: var(--muted); font-size: .85rem; }
+
+.menu { position: relative; }
+.menu summary {
+  list-style: none; display: grid; place-items: center;
+  width: var(--tap); height: var(--tap);
+  font-size: 1.5rem; color: var(--muted); border-radius: 50%;
+}
+.menu summary::-webkit-details-marker { display: none; }
+.menu[open] summary { background: var(--hover); }
+.menu nav {
+  position: absolute; right: 0; top: calc(var(--tap) + 4px); min-width: min(12rem, calc(100vw - 16px)); max-width: calc(100vw - 16px); max-height: calc(100vh - var(--tap) - 24px); max-height: calc(100dvh - var(--tap) - 24px); overflow-y: auto;
+  background: var(--popover); border: 1px solid var(--popover-edge); border-radius: var(--radius);
+  box-shadow: 0 6px 24px rgba(0,0,0,.35); padding: .35rem 0; z-index: 20;
+}
+.menu nav a, .menu nav button {
+  display: block; width: 100%; text-align: left;
+  padding: .7rem 1rem; min-height: var(--tap);
+  color: var(--text); text-decoration: none; background: none; border: 0;
+}
+.menu nav a:hover, .menu nav button:hover { background: var(--popover-hover); }
+.menu nav .text-size { display: flex; align-items: center; min-height: var(--tap); padding: 0 .5rem 0 1rem; }
+.text-size span { flex: 1; }
+.menu nav .text-size button { width: var(--tap); padding: 0; display: grid; place-items: center; border-radius: 50%; font-weight: 600; color: var(--link); }
+.menu nav .text-size button:first-of-type { font-size: .85rem; }
+.menu nav .text-size button:disabled { color: var(--muted); opacity: .5; background: none; }
+
+/* ---- Page body ---- */
+.page { max-width: 40rem; margin: 0 auto; padding: 1rem max(1rem, env(safe-area-inset-left)); }
+.center { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 1.25rem 1rem; }
+.card {
+  background: var(--panel); border-radius: var(--radius);
+  padding: 1.25rem; box-shadow: 0 1px 2px var(--shadow);
+}
+.signin { width: 100%; max-width: 24rem; text-align: center; }
+.signin form { text-align: left; }
+.group-avatar {
+  width: 88px; height: 88px; margin: .25rem auto 1rem;
+  border-radius: 33%; display: grid; place-items: center; font-size: 44px;
+  background: linear-gradient(#72d5fd, #2a9ef1);
+}
+.tg-login { min-height: 48px; margin: 1.25rem 0 .5rem; display: flex; justify-content: center; }
+.or { display: flex; align-items: center; gap: .75rem; margin: 1.25rem 0; color: var(--muted); }
+.or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--divider); }
+
+.profile-head { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+.profile-head p { margin: .25rem 0 0; }
+
+/* ---- Forms ---- */
+.stack { display: grid; gap: 1rem; margin-top: .5rem; }
+label { display: grid; gap: .35rem; font-size: .92rem; color: var(--muted); }
+input {
+  font: inherit; font-size: 1rem; /* 16px+ stops iOS zooming in on focus */
+  color: var(--text);
+  width: 100%; min-height: var(--tap); padding: .6rem .8rem;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--panel);
+}
+input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+button.primary {
+  min-height: var(--tap); border: 0; border-radius: 10px;
+  background: var(--accent); color: #fff; font-weight: 600; font-size: 1rem;
+}
+button.primary:hover { background: var(--accent-dark); }
+button.link { background: none; border: 0; color: var(--accent); padding: .5rem; min-height: 40px; }
+button.link.danger { color: var(--danger); }
+
+.notice { padding: .7rem .9rem; border-radius: 10px; background: var(--ok-bg); color: var(--text); text-align: left; }
+.notice.error { background: var(--error-bg); color: var(--error-text); }
+
+/* ---- Avatars: Telegram's seven peer colors ---- */
+.avatar {
+  flex: none; display: inline-grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 50%;
+  color: #fff; font-weight: 600; font-size: .95rem; letter-spacing: .02em;
+}
+.avatar.lg { width: 64px; height: 64px; font-size: 1.35rem; }
+img.avatar { object-fit: cover; background: var(--hover); }
+.avatar.xl { width: 96px; height: 96px; font-size: 2rem; }
+.avatar.c0 { background: linear-gradient(#ff845e, #d45246); }
+.avatar.c1 { background: linear-gradient(#febb5b, #f68136); }
+.avatar.c2 { background: linear-gradient(#b694f9, #6c61df); }
+.avatar.c3 { background: linear-gradient(#9ad164, #46ba43); }
+.avatar.c4 { background: linear-gradient(#53edd6, #28c9b7); }
+.avatar.c5 { background: linear-gradient(#5caffa, #408acf); }
+.avatar.c6 { background: linear-gradient(#ff8aac, #d95574); }
+
+/* ---- Lists (admin) ---- */
+.tabs { display: flex; gap: .25rem; overflow-x: auto; margin-bottom: .75rem; }
+.tabs a {
+  flex: none; padding: .55rem .9rem; border-radius: 999px; min-height: 44px;
+  display: inline-flex; align-items: center; gap: .4rem;
+  text-decoration: none; color: var(--muted); background: var(--panel);
+}
+.tabs a.on { background: var(--accent); color: #fff; }
+.tabs .count { font-size: .8rem; opacity: .8; }
+.search { margin-bottom: .75rem; }
+.list { list-style: none; margin: 0 0 1.5rem; padding: 0; background: var(--panel); border-radius: var(--radius); overflow: hidden; }
+.list li { display: flex; gap: .75rem; align-items: center; padding: .7rem 1rem; border-bottom: 1px solid var(--divider); flex-wrap: wrap; }
+.list li:last-child { border-bottom: 0; }
+.list.compact li { padding: .55rem 1rem; }
+.grow { flex: 1; min-width: 10rem; }
+.name { font-weight: 600; }
+.badge-role { font-size: .75rem; font-weight: 500; color: var(--accent); margin-left: .35rem; }
+.row-actions { display: flex; gap: .25rem; margin-left: auto; }
+.section { font-size: 1rem; color: var(--muted); margin: 1.5rem .25rem .5rem; font-weight: 600; }
+
+.credits { text-align: center; margin: 1.5rem .5rem; }
+.photo-form { margin: 0 0 1rem; display: grid; gap: .5rem; }
+.row-buttons { display: flex; justify-content: flex-end; gap: .5rem; }
+.row-buttons.left { justify-content: flex-start; align-items: center; }
+button.primary.pad { padding: 0 1.2rem; }
+
+.invites summary { cursor: pointer; padding: .25rem 0; }
+.inline-invite { display: grid; gap: .75rem; margin: 1rem 0; }
+.new-link { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.link-box { font-size: .9rem; }
+.card.invites { margin-bottom: 1rem; }
+.card + .card { margin-top: 1rem; }
+.card-title { font-size: 1.1rem; margin: 0 0 .5rem; }
+.steps { padding-left: 1.3rem; display: grid; gap: .6rem; }
+.install h1 { margin-top: .25rem; }
+#push-actions button.primary { width: 100%; }
+
+/* Checkboxes and radio buttons with their label on one line. */
+.checkbox { display: flex; gap: .6rem; align-items: center; color: var(--text); font-size: 1rem; min-height: 44px; }
+.checkbox input, .page form.stack .checkbox input, .box .checkbox input { width: 22px; height: 22px; min-height: 0; flex: none; margin: 0; accent-color: var(--accent); }

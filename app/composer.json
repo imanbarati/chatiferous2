@@ -1,0 +1,10 @@
+{
+  "name": "chatiferous/app",
+  "description": "Chatiferous server code (PHP). Only dependency: Web Push sending.",
+  "require": {
+    "php": ">=8.2",
+    "minishlink/web-push": "^11.0",
+    "guzzlehttp/guzzle": "^8.2"
+  },
+  "config": { "optimize-autoloader": true }
+}
